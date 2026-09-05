@@ -1,5 +1,15 @@
 /* ============================================================================
    app.js — Démarrage, navigation, session.
+
+   Deux régimes possibles, choisis automatiquement :
+
+   • Base en ligne configurée (config.js → supabase) : la connexion se fait
+     par e-mail et mot de passe, et c'est le SERVEUR qui dit qui a le droit
+     d'écrire. Un adhérent est réellement bloqué, pas seulement bridé.
+
+   • Sinon : comptes locaux à code d'accès, stockés dans le journal. Utile
+     pour un PC seul, hors ligne, mais la protection n'est que celle de
+     l'écran.
    ========================================================================== */
 
 import * as DB from './db.js';
@@ -21,28 +31,41 @@ const ONGLETS = [
 ];
 
 const synchro = new Synchro(CONFIG);
+const surServeur = synchro.supabase.disponible();
 let ongletActif = localStorage.getItem('tontine:onglet') || 'tableau';
-let annee = +localStorage.getItem('tontine:annee') || 0;   // 0 = à déterminer au démarrage
+let annee = +localStorage.getItem('tontine:annee') || 0;
+// Tant que l'utilisateur n'a pas choisi une année lui-même, on se replace
+// automatiquement sur celle qui contient des données — sinon un appareil qui
+// se connecte pour la première fois ouvre une année vide alors que la base
+// est pleine.
+let anneeChoisie = !!annee;
 let session = null;
 let feuilleStyle = '';
 
 /* ------------------------------------------------------------------ contexte */
 
 function contexte() {
+  const peutEcrire = session?.role === 'admin';
   return {
     etat: synchro.etat,
     synchro,
     session,
     annee,
-    peutEcrire: session?.role === 'admin',
-    setAnnee(a) { annee = a; localStorage.setItem('tontine:annee', a); rendre(); },
+    peutEcrire,
+    surServeur,
+    setAnnee(a) { annee = a; anneeChoisie = true; localStorage.setItem('tontine:annee', a); rendre(); },
     rafraichir: rendre,
-    blocComptes: session?.role === 'admin' ? Comptes.blocComptes : null,
-    deconnexion() { Comptes.fermerSession(); session = null; rendre(); },
+    blocComptes: surServeur
+      ? Comptes.blocComptesServeur
+      : (peutEcrire ? Comptes.blocComptes : null),
+    deconnexion() {
+      if (surServeur) synchro.deconnecter('supabase');
+      else Comptes.fermerSession();
+      session = null;
+      rendre();
+    },
     async enregistrer(entite, type, donnees) {
-      if (session?.role !== 'admin' && !(entite === 'compte' && !synchro.etat.comptes.length)) {
-        return toast('Consultation seule : vous ne pouvez pas modifier les données.');
-      }
+      if (!peutEcrire) return toast('Consultation seule : vous ne pouvez pas modifier les données.');
       try { await synchro.enregistrer(entite, type, donnees); }
       catch (e) { toast('Erreur : ' + e.message); }
     },
@@ -67,9 +90,9 @@ function contexte() {
   };
 }
 
-/* ------------------------------------------------------------------- rendu */
+/* --------------------------------------------------------------------- rendu */
 
-/** Première ouverture : se placer sur l'année la plus récente qui contient des données. */
+/** Première ouverture : se placer sur l'année la plus récente qui a des données. */
 function anneeParDefaut(etat) {
   const avecDonnees = [...new Set(etat.cotisations.map((c) => c.annee))].filter(Boolean);
   const courante = new Date().getFullYear();
@@ -80,37 +103,51 @@ function anneeParDefaut(etat) {
 function rendre() {
   const app = document.getElementById('app');
   const etat = synchro.etat;
-  if (!annee) annee = anneeParDefaut(etat);
+  if (!anneeChoisie) annee = anneeParDefaut(etat);
+  const onglets = document.getElementById('onglets');
 
   majEtatSynchro();
+  document.querySelector('#entete .titre').textContent =
+    etat.association.nom || 'Tontine';
 
-  // Aucun compte : on demande la création du premier administrateur.
-  if (!Comptes.comptesDe(etat).length) {
-    document.getElementById('onglets').hidden = true;
-    app.replaceChildren(Comptes.ecranPremierAdmin(async (compte) => {
-      await synchro.enregistrer('compte', 'upsert', compte);
-      Comptes.ouvrirSession(compte);
-      session = compte;
-      rendre();
-    }));
-    return;
+  /* --- régime « base en ligne » --------------------------------------- */
+  if (surServeur) {
+    if (!synchro.supabase.estConnecte()) {
+      onglets.hidden = true;
+      app.replaceChildren(Comptes.ecranConnexionServeur(synchro, (profil) => {
+        session = profil;
+        rendre();
+      }));
+      return;
+    }
+    session = synchro.supabase.profil;
+  } else {
+    /* --- régime « comptes locaux » ------------------------------------ */
+    if (!Comptes.comptesDe(etat).length) {
+      onglets.hidden = true;
+      app.replaceChildren(Comptes.ecranPremierAdmin(async (compte) => {
+        await synchro.enregistrer('compte', 'upsert', compte);
+        Comptes.ouvrirSession(compte);
+        session = compte;
+        rendre();
+      }));
+      return;
+    }
+    session = session || Comptes.sessionCourante(etat);
+    if (!session) {
+      onglets.hidden = true;
+      app.replaceChildren(Comptes.ecranConnexion(etat, (c) => {
+        Comptes.ouvrirSession(c); session = c; rendre();
+      }));
+      return;
+    }
   }
 
-  session = session || Comptes.sessionCourante(etat);
-  if (!session) {
-    document.getElementById('onglets').hidden = true;
-    app.replaceChildren(Comptes.ecranConnexion(etat, (c) => {
-      Comptes.ouvrirSession(c); session = c; rendre();
-    }));
-    return;
-  }
-
-  document.getElementById('onglets').hidden = false;
+  onglets.hidden = false;
   const ctx = contexte();
   const onglet = ONGLETS.find((o) => o.cle === ongletActif) || ONGLETS[0];
   dessinerOnglets();
   app.replaceChildren(onglet.vue(ctx));
-  document.querySelector('#entete .titre').textContent = etat.association.nom || 'Tontine';
 }
 
 function dessinerOnglets() {
@@ -124,23 +161,25 @@ function dessinerOnglets() {
 function majEtatSynchro() {
   const z = document.getElementById('etatSynchro');
   if (!z) return;
-  let classe = 'hors', texte = 'Hors ligne';
+  let classe, texte;
   if (synchro.enCours) { classe = ''; texte = 'Synchronisation…'; }
+  else if (synchro.nbEnAttente) { classe = 'souci'; texte = `${synchro.nbEnAttente} à envoyer`; }
   else if (synchro.erreur) { classe = 'souci'; texte = 'Synchro à refaire'; }
-  else if (synchro.distant) { classe = 'ok'; texte = 'OneDrive à jour'; }
-  else { classe = 'hors'; texte = 'Sur cet appareil'; }
+  else if (synchro.distants.length) {
+    classe = 'ok';
+    texte = synchro.distants.length > 1 ? 'À jour partout'
+      : synchro.distants[0].type === 'supabase' ? 'Base en ligne à jour' : 'OneDrive à jour';
+  } else { classe = 'hors'; texte = 'Sur cet appareil'; }
   z.className = classe;
   z.replaceChildren(h('span', { class: 'pastille' }), h('span', {}, texte));
   z.title = synchro.erreur || (synchro.derniereSynchro
     ? 'Dernière synchronisation à ' + synchro.derniereSynchro.toLocaleTimeString('fr-FR') : '');
 }
 
-/* --------------------------------------------------------------- démarrage */
+/* ----------------------------------------------------------------- démarrage */
 
 async function demarrer() {
-  try {
-    feuilleStyle = await (await fetch('app.css')).text();
-  } catch { feuilleStyle = ''; }
+  try { feuilleStyle = await (await fetch('app.css')).text(); } catch { feuilleStyle = ''; }
 
   synchro.addEventListener('maj', rendre);
   document.getElementById('etatSynchro').addEventListener('click', () => synchro.synchroniser());
@@ -148,17 +187,15 @@ async function demarrer() {
   await synchro.demarrer();
   rendre();
 
-  // Reprise automatique des données du classeur au tout premier lancement.
-  if (!synchro.nbEvenements) {
+  // Reprise des données du classeur au tout premier lancement (PC hors ligne).
+  if (!synchro.nbEvenements && !surServeur) {
     try {
       const texte = await (await fetch('donnees/journal/ev-reprise-excel.jsonl')).text();
       await synchro.importerJournal(texte, 'ev-reprise-excel.jsonl');
-      annee = anneeParDefaut(synchro.etat);
       rendre();
     } catch { /* pas de fichier de reprise : on démarre à vide */ }
   }
 
-  // Synchronisation régulière et au retour au premier plan.
   setInterval(() => { if (!document.hidden) synchro.synchroniser(); }, 90_000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) synchro.synchroniser(); });
   window.addEventListener('online', () => synchro.synchroniser());

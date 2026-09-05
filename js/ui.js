@@ -575,10 +575,8 @@ export function vueReglages(ctx) {
 
   const bloc = (titre, ...contenu) => h('div', { class: 'carte' }, h('h2', {}, titre), ...contenu);
 
-  const distant = synchro.distant;
-  const etatTexte = distant
-    ? `Connecté — ${distant.etiquette()}`
-    : 'Pas encore relié à OneDrive : les données restent sur cet appareil.';
+  const relie = synchro.distants.length > 0;
+  const dossierRelie = synchro.distants.includes(synchro.dossier);
 
   const zoneImport = h('input', { type: 'file', accept: '.jsonl,.json,.txt', style: 'display:none',
     onChange: async (e) => {
@@ -594,8 +592,7 @@ export function vueReglages(ctx) {
     h('div', { class: 'barre' },
       h('h1', {}, 'Réglages'),
       h('span', { class: 'doux pousse' },
-        ctx.session ? `Connecté : ${ctx.session.nom} (${admin ? 'administrateur' : 'consultation'})` : ''),
-      ctx.session ? h('button', { onClick: ctx.deconnexion }, 'Se déconnecter') : null),
+        ctx.session ? `Connecté : ${ctx.session.nom} (${admin ? 'administrateur' : 'consultation'})` : '')),
 
     ctx.blocComptes ? ctx.blocComptes(ctx) : null,
 
@@ -607,25 +604,30 @@ export function vueReglages(ctx) {
           'Créer le fichier de consultation'),
         h('button', { onClick: () => ctx.partagerConsultation() }, 'Partager…'))),
 
-    admin ? bloc('Base de données sur OneDrive',
-      h('p', { class: 'doux' }, etatTexte),
+    bloc('Où vont les données',
+      h('ul', { class: 'doux', style: 'margin:.2rem 0 .8rem;padding-left:1.1rem;line-height:1.8' },
+        h('li', {}, 'Cet appareil — toujours, même sans réseau'),
+        synchro.distants.map((d) => h('li', {}, d.etiquette(),
+          h('span', { class: 'etiquette', style: 'margin-left:.4rem' }, 'actif'))),
+        !relie ? h('li', {}, 'Aucune destination distante : rien ne quitte cet appareil.') : null),
       h('div', { class: 'barre' },
-        synchro.dossier.disponible()
-          ? h('button', { class: distant ? '' : 'primaire', onClick: async () => {
-              try { await synchro.connecterDossier(); toast('Dossier relié.'); }
+        synchro.dossier.disponible() && !dossierRelie
+          ? h('button', { class: relie ? '' : 'primaire', onClick: async () => {
+              try { await synchro.connecterDossier(); toast('Dossier OneDrive relié.'); }
               catch (e) { toast(e.message); } } },
-            'Choisir le dossier OneDrive (PC)')
+            'Relier le dossier OneDrive (PC)')
           : null,
-        synchro.graph.disponible()
-          ? h('button', { class: distant ? '' : 'primaire', onClick: () => synchro.connecterOneDrive() },
-            'Se connecter à OneDrive (téléphone)')
-          : h('span', { class: 'doux' }, 'Connexion mobile non configurée — voir le guide d’installation.'),
-        distant ? h('button', { onClick: () => { synchro.deconnecter(); toast('Déconnecté.'); } }, 'Se déconnecter') : null,
-        h('button', { onClick: () => synchro.synchroniser() }, 'Synchroniser maintenant')),
+        h('button', { onClick: () => synchro.synchroniser() }, 'Synchroniser maintenant'),
+        ctx.session ? h('button', { onClick: ctx.deconnexion }, 'Se déconnecter') : null),
       h('p', { class: 'doux' },
         `Appareil : ${synchro.nomAppareil} · ${synchro.nbEvenements} écritures dans l'historique` +
+        (synchro.nbEnAttente ? ` · ${synchro.nbEnAttente} en attente d'envoi` : '') +
         (synchro.derniereSynchro ? ` · dernière synchro à ${synchro.derniereSynchro.toLocaleTimeString('fr-FR')}` : '')),
-      synchro.erreur ? h('div', { class: 'mauvais' }, synchro.erreur) : null) : null,
+      ctx.surServeur && !dossierRelie && synchro.dossier.disponible()
+        ? h('div', { class: 'avert' },
+            'Sur le PC, reliez aussi le dossier OneDrive : la base en ligne fait circuler les saisies entre les appareils, et OneDrive en garde la copie complète et lisible.')
+        : null,
+      synchro.erreur ? h('div', { class: 'mauvais' }, synchro.erreur) : null),
 
     bloc('Association',
       h('table', {}, h('tbody', {},
