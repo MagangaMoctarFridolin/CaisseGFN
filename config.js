@@ -11,8 +11,8 @@ export const CONFIG = {
      données, pas le secret de ces valeurs.
      N'inscrivez JAMAIS ici la clé « service_role ».                        */
   supabase: {
-    url: '',        // ex. 'https://abcdefghijk.supabase.co'
-    anonKey: ''     // la clé « anon public »
+    url: 'https://dcxjtgibedlbtjtvkvdk.supabase.co',
+    anonKey: 'sb_publishable_gpTHLz8QjUEFh44JUhwCow_Nu8CYutR'
   },
 
   /* --- OneDrive par l'API Microsoft (facultatif) -------------------------
