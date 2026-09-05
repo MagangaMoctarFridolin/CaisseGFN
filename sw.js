@@ -3,7 +3,7 @@
    (cache local du navigateur + OneDrive). Ici, on ne met en cache que
    l'application elle-même. */
 
-const CACHE = 'tontine-app-v1';
+const CACHE = 'tontine-app-v2';
 const FICHIERS = [
   '.', 'index.html', 'app.css', 'config.js',
   'js/app.js', 'js/db.js', 'js/ui.js', 'js/synchro.js', 'js/stockage.js', 'js/comptes.js',
@@ -27,8 +27,17 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
 
   // L'application : le réseau d'abord, le cache en secours.
+  //
+  // `cache: 'no-cache'` force une revalidation auprès du serveur. Sans cela,
+  // le cache HTTP du navigateur peut resservir un ancien config.js pendant
+  // plusieurs minutes après une mise à jour — l'appareil garde alors une
+  // configuration périmée sans que rien ne le signale.
+  const requete = (url.origin === location.origin && !/\/donnees\//.test(url.pathname))
+    ? new Request(e.request, { cache: 'no-cache' })
+    : e.request;
+
   e.respondWith(
-    fetch(e.request)
+    fetch(requete)
       .then((r) => {
         if (r.ok && url.origin === location.origin) {
           const copie = r.clone();
