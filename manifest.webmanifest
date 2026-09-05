@@ -1,0 +1,17 @@
+{
+  "name": "Tontine — La Grande Famille Nielili",
+  "short_name": "Tontine",
+  "description": "Gestion des cotisations, prêts et comptabilité de la tontine, avec la base de données sur OneDrive.",
+  "lang": "fr",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f6f7f9",
+  "theme_color": "#0f6b4f",
+  "icons": [
+    { "src": "icones/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icones/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icones/icone-512-masque.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
