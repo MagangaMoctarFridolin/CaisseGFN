@@ -62,9 +62,6 @@ Quelqu'un qui s'inscrit **sans** le code, ou avec un mauvais code, reste en
 attente et ne voit rien. Il apparaît alors dans **Réglages → Comptes** avec un
 bouton **Approuver** : les deux voies coexistent.
 
-Pour faire de quelqu'un le second administrateur : **Modifier** en face de son
-nom, puis changez le rôle.
-
 ---
 
 ## 3. Le PC
@@ -110,6 +107,28 @@ pas un simple masquage.
 
 Un adhérent ne peut pas davantage se promouvoir administrateur, approuver
 quelqu'un, ni suspendre un compte.
+
+### Ce que vous pouvez faire sur chaque compte
+
+Dans **Réglages → Comptes**, en face de chaque nom :
+
+| Bouton | Effet |
+|---|---|
+| **Approuver** | Donne l'accès à quelqu'un qui s'est inscrit sans le code. |
+| **Bloquer** | Retire l'accès sans effacer le compte. La personne voit *« Accès suspendu »* et plus aucun montant. Le code d'accès ne la fait pas rentrer : vous seul pouvez rouvrir. |
+| **Débloquer** | Rend l'accès à un compte bloqué. |
+| **Modifier** | Change le nom affiché, le rôle (consultation ↔ administrateur) et la fiche adhérent associée. |
+| **Supprimer** | Efface définitivement le compte et son mot de passe. Les saisies déjà faites restent dans l'historique. |
+
+Deux protections sont posées dans la base elle-même, pas seulement à l'écran :
+vous ne pouvez pas supprimer **votre propre compte**, ni le **dernier
+administrateur** — sans quoi plus personne ne pourrait rien saisir.
+
+Un compte bloqué ou supprimé perd la main dans la minute et demie qui suit,
+même si l'application était déjà ouverte sur son téléphone.
+
+Pour faire de quelqu'un le second administrateur : **Modifier**, puis changez
+le rôle.
 
 ---
 
@@ -165,7 +184,9 @@ dessus force une synchronisation.
 |---|---|
 | La fenêtre noire se ferme aussitôt | Python n'est pas installé — Microsoft Store → Python 3 |
 | « Connexion refusée » | Vérifiez l'adresse e-mail et le mot de passe. Jamais inscrit ? Cliquez sur « Première fois ici ». |
-| « Compte en attente » | Normal : un administrateur doit vous approuver (Réglages → Comptes) |
+| « Compte en attente » | Normal : saisissez le code d'accès, ou attendez qu'un administrateur vous approuve |
+| « Accès suspendu » | Un administrateur a bloqué ce compte. Lui seul peut le débloquer (Réglages → Comptes → Débloquer). |
+| « Ce compte n'existe plus » | Le compte a été supprimé. Il faut en recréer un depuis « Première fois ici ». |
 | Connecté mais tout est en lecture seule | Votre compte est en consultation ; un administrateur peut changer votre rôle |
 | « n à envoyer » qui persiste | Pas de réseau, ou session expirée : déconnectez-vous et reconnectez-vous |
 | Le PC affiche « Base en ligne à jour » sans OneDrive | Réglages → Relier le dossier OneDrive |
