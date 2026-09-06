@@ -196,6 +196,12 @@ export class Synchro extends EventTarget {
     if (!this.distants.length || this.enCours) return;
     this.enCours = true; this.prevenir();
     try {
+      // Relire le profil à chaque passage : un compte approuvé, bloqué ou
+      // supprimé pendant que l'application est ouverte s'en aperçoit dans la
+      // minute et demie, sans avoir à recharger la page.
+      if (this.supabase?.estConnecte?.()) {
+        try { await this.supabase.chargerProfil(); } catch { /* réseau : on garde le profil connu */ }
+      }
       await this.#pousser();
 
       const recoltes = [];
