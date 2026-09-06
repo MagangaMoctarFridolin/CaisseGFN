@@ -89,32 +89,20 @@ Le téléphone lit et écrit dans la base en ligne. Il ne touche pas directement
 
 ## 5. Les comptes
 
-Deux niveaux, et la frontière passe par les Réglages :
+- **Administrateur** (deux) — saisit les cotisations, les prêts, la
+  comptabilité, gère les adhérents et les comptes.
+- **Adhérent approuvé** — consulte, **imprime et exporte** : tableau de bord,
+  cotisations, prêts, comptabilité, rapport annuel, fiche individuelle, export
+  CSV pour Excel, et le fichier de consultation à partager. Il ne saisit rien.
 
-- **Adhérent approuvé** — consulte ET saisit : cotisations, prêts,
-  comptabilité, fiches adhérents, rapports. Tout, sauf la gestion des comptes.
-- **Administrateur** — la même chose, plus : approuver les nouveaux comptes,
-  changer les rôles, modifier les informations de l'association, relier le
-  dossier OneDrive.
+Ce que « consultation » veut dire ici, et c'est le point important : le refus
+vient de la base de données, pas de l'application. Un adhérent qui modifierait
+la page dans son navigateur pour faire réapparaître les champs de saisie se
+verrait quand même opposer un refus par le serveur. C'est une vraie barrière,
+pas un simple masquage.
 
-Un adhérent ne peut donc ni s'octroyer des droits, ni approuver quelqu'un, ni
-suspendre un compte. Ce refus vient de la base de données, pas de l'écran : il
-tient même si quelqu'un manipule la page dans son navigateur.
-
-### Ce que cela implique
-
-Onze personnes pouvant saisir, c'est pratique, mais les erreurs deviennent
-possibles. Deux garde-fous existent :
-
-- **Rien n'est jamais effacé.** Chaque écriture est ajoutée au journal avec
-  son auteur et son horodatage. Une valeur corrigée n'écrase pas l'ancienne,
-  elle s'ajoute par-dessus — et l'historique reste consultable.
-- **Le retour en arrière est immédiat.** Si un adhérent saisit de travers,
-  **Réglages → Comptes → Modifier → Accès : Suspendu** lui retire tout droit
-  sur-le-champ. Vous pouvez aussi le remettre en consultation seule.
-
-Si les erreurs se multiplient, revenez à la règle d'origine : seuls les deux
-administrateurs saisissent, les autres consultent.
+Un adhérent ne peut pas davantage se promouvoir administrateur, approuver
+quelqu'un, ni suspendre un compte.
 
 ---
 
@@ -174,7 +162,7 @@ dessus force une synchronisation.
 | Connecté mais tout est en lecture seule | Votre compte est en consultation ; un administrateur peut changer votre rôle |
 | « n à envoyer » qui persiste | Pas de réseau, ou session expirée : déconnectez-vous et reconnectez-vous |
 | Le PC affiche « Base en ligne à jour » sans OneDrive | Réglages → Relier le dossier OneDrive |
-| Un adhérent ne peut pas saisir | Son compte n'est pas encore approuvé, ou il a été suspendu |
+| Un adhérent ne peut pas saisir | C'est voulu : la saisie est réservée aux administrateurs |
 | Un adhérent ne voit pas les Réglages complets | C'est voulu : la gestion des comptes est réservée aux administrateurs |
 
 ---

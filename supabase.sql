@@ -140,20 +140,16 @@ create policy evenements_lecture on public.evenements for select to authenticate
   using (public.est_valide());
 
 -- ===========================================================================
---  Droits élargis : les adhérents approuvés peuvent saisir
+--  Qui écrit, qui consulte
 --
---  Décision du 6 septembre 2026 : tout compte approuvé peut renseigner les
---  cotisations, les prêts, la comptabilité et les adhérents. Seule la gestion
---  des comptes (approbation, rôles) reste réservée aux administrateurs.
---
---  Rien n'est perdu pour autant : le journal conserve chaque écriture avec
---  son auteur et son horodatage, et aucune ligne ne peut être ni modifiée ni
---  supprimée. Une erreur se corrige, elle ne s'efface pas.
+--  Seuls les ADMINISTRATEURS saisissent. Un adhérent approuvé consulte,
+--  imprime et exporte — il n'écrit rien, et le refus vient de la base, pas
+--  de l'écran.
 -- ===========================================================================
 
 drop policy if exists evenements_ajout on public.evenements;
 create policy evenements_ajout on public.evenements for insert to authenticated
-  with check (public.est_valide());
+  with check (public.est_admin());
 
 drop policy if exists profils_ecriture on public.profils;
 create policy profils_ecriture on public.profils for all to authenticated
