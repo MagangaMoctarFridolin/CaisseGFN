@@ -92,17 +92,49 @@ create policy evenements_ajout on public.evenements
 -- Personne, pas même un administrateur, ne peut réécrire l'histoire depuis
 -- l'application. Une correction se fait en ajoutant un nouvel événement.
 
--- --------------------------------------------- création du premier profil --
+-- ===========================================================================
+--  Inscription depuis l'application (ajoute apres coup)
 --
---  Après avoir créé vos utilisateurs dans Authentication → Users, revenez
---  ici et exécutez ces deux lignes en remplaçant les adresses e-mail.
---  La toute première doit être un administrateur, sinon plus personne ne
---  pourra écrire.
---
---  insert into public.profils (id, nom, role)
---  select id, 'Fridolin', 'admin' from auth.users where email = 'vous@exemple.com'
---  on conflict (id) do update set role = 'admin', nom = excluded.nom;
---
---  insert into public.profils (id, nom, role)
---  select id, 'Adiza', 'adherent' from auth.users where email = 'adiza@exemple.com'
---  on conflict (id) do update set role = 'adherent', nom = excluded.nom;
+--  Plus besoin de creer les comptes dans le tableau de bord : chacun s'inscrit
+--  depuis l'ecran de connexion. Le TOUT PREMIER compte devient administrateur
+--  et a acces immediatement ; les suivants arrivent "en attente" et ne voient
+--  rien tant qu'un administrateur ne les a pas approuves d'un clic.
+-- ===========================================================================
+
+alter table public.profils add column if not exists valide boolean not null default false;
+
+create or replace function public.est_valide()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profils where id = auth.uid() and valide);
+$$;
+
+create or replace function public.est_admin()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profils where id = auth.uid() and role = 'admin' and valide);
+$$;
+
+create or replace function public.nouveau_profil()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare premier boolean;
+begin
+  select count(*) = 0 into premier from public.profils;
+  insert into public.profils (id, nom, role, valide)
+  values (new.id,
+          coalesce(nullif(new.raw_user_meta_data->>'nom',''), split_part(new.email, '@', 1)),
+          case when premier then 'admin' else 'adherent' end,
+          premier)
+  on conflict (id) do nothing;
+  return new;
+end; $$;
+
+drop trigger if exists creer_profil on auth.users;
+create trigger creer_profil after insert on auth.users
+  for each row execute function public.nouveau_profil();
+
+drop policy if exists profils_lecture on public.profils;
+create policy profils_lecture on public.profils for select to authenticated
+  using (id = auth.uid() or public.est_valide());
+
+drop policy if exists evenements_lecture on public.evenements;
+create policy evenements_lecture on public.evenements for select to authenticated
+  using (public.est_valide());
