@@ -477,6 +477,37 @@ export class StockageSupabase {
     }
   }
 
+  /* ------------------------------------------- code d'accès de l'association */
+
+  /**
+   * Présente le code d'accès au serveur. S'il correspond, le compte est
+   * approuvé sur-le-champ. La vérification a lieu dans la base : ni le code
+   * attendu ni la table qui le contient ne sont accessibles au navigateur.
+   */
+  async rejoindreAvecCode(code) {
+    const r = await this.#appel('/rest/v1/rpc/rejoindre', {
+      method: 'POST', body: JSON.stringify({ code: (code || '').trim() })
+    });
+    const accepte = await r.json();
+    if (accepte === true) await this.chargerProfil();
+    return accepte === true;
+  }
+
+  /** Administrateurs seulement : lire le code en vigueur. */
+  async lireCodeAdhesion() {
+    const r = await this.#appel('/rest/v1/rpc/lire_code_adhesion', {
+      method: 'POST', body: '{}'
+    });
+    return (await r.json()) || '';
+  }
+
+  /** Administrateurs seulement : définir un nouveau code. */
+  async definirCodeAdhesion(code) {
+    await this.#appel('/rest/v1/rpc/definir_code_adhesion', {
+      method: 'POST', body: JSON.stringify({ nouveau: (code || '').trim() })
+    });
+  }
+
   /** Liste des comptes, pour l'écran Réglages. */
   async listerProfils() {
     const r = await this.#appel('/rest/v1/profils?select=id,nom,role,adherent_id,valide&order=nom.asc');

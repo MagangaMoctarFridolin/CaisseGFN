@@ -566,6 +566,43 @@ function exporterJSON(etat) {
     JSON.stringify(etat, null, 1), 'application/json');
 }
 
+/* --------------------------------- code d'accès de l'association (admin) --- */
+
+function blocCodeAdhesion(ctx) {
+  const { synchro } = ctx;
+  const valeur = h('span', { class: 'doux' }, 'Chargement…');
+
+  const afficher = (code) => valeur.replaceChildren(code
+    ? h('span', { style: 'font-size:1.3rem;font-weight:700;letter-spacing:.06em;color:var(--accent)' }, code)
+    : h('span', { class: 'doux' }, 'Aucun code défini — les inscriptions attendent votre approbation.'));
+
+  const charger = async () => {
+    try { afficher(await synchro.supabase.lireCodeAdhesion()); }
+    catch (e) { valeur.replaceChildren(h('span', { class: 'doux' }, 'Indisponible : ' + e.message)); }
+  };
+  charger();
+
+  const modifier = () => formulaire('Code d’accès de l’association', [
+    { cle: 'code', libelle: 'Code (laisser vide pour le désactiver)' }
+  ], async (v) => {
+    try {
+      await synchro.supabase.definirCodeAdhesion(v.code);
+      toast(v.code ? 'Code enregistré.' : 'Code désactivé.');
+      charger();
+    } catch (e) { toast(e.message); }
+  });
+
+  return h('div', { class: 'carte' },
+    h('h2', {}, 'Code d’accès de l’association'),
+    h('p', { class: 'doux' },
+      'Communiquez ce code aux adhérents. Celui qui le saisit à l’inscription entre immédiatement, sans que vous ayez à intervenir. Les autres restent en attente de votre approbation.'),
+    h('div', { style: 'margin:.6rem 0' }, valeur),
+    h('div', { class: 'barre' },
+      h('button', { class: 'primaire', onClick: modifier }, 'Changer le code')),
+    h('p', { class: 'doux' },
+      'Changez-le si quelqu’un le diffuse trop largement : les comptes déjà créés ne sont pas affectés.'));
+}
+
 /* ================================================================ réglages === */
 
 export function vueReglages(ctx) {
@@ -615,6 +652,8 @@ export function vueReglages(ctx) {
       h('div', { class: 'barre' },
         h('button', { class: 'primaire', onClick: () => zoneImport.click() },
           'Importer le fichier de reprise'))) : null,
+
+    admin && ctx.surServeur ? blocCodeAdhesion(ctx) : null,
 
     ctx.blocComptes ? ctx.blocComptes(ctx) : null,
 

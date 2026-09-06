@@ -142,9 +142,10 @@ function rendre() {
     // Compte créé mais pas encore approuvé : rien ne doit être visible.
     if (session && !session.valide) {
       onglets.hidden = true;
-      app.replaceChildren(Comptes.ecranEnAttente(session, () => {
-        synchro.deconnecter('supabase'); session = null; ecranAuth = null; rendre();
-      }));
+      app.replaceChildren(Comptes.ecranEnAttente(session,
+        () => { synchro.deconnecter('supabase'); session = null; ecranAuth = null; rendre(); },
+        synchro,
+        () => { session = synchro.supabase.profil; rendre(); }));
       return;
     }
   } else {

@@ -244,6 +244,8 @@ export function ecranConnexionServeur(synchro, surConnexion) {
       autocomplete: 'username', required: true, inputmode: 'email' });
     const motDePasse = h('input', { type: 'password', required: true,
       autocomplete: inscription ? 'new-password' : 'current-password' });
+    const codeAcces = h('input', { type: 'text', autocapitalize: 'characters',
+      autocomplete: 'off', placeholder: 'facultatif' });
     const bouton = h('button', { class: 'primaire', type: 'submit',
       style: 'width:100%;justify-content:center' },
       inscription ? 'Créer mon compte' : 'Se connecter');
@@ -270,9 +272,17 @@ export function ecranConnexionServeur(synchro, surConnexion) {
       bouton.textContent = inscription ? 'Création…' : 'Connexion…';
       message.replaceChildren();
       try {
-        const profil = inscription
+        let profil = inscription
           ? await synchro.inscrireSupabase(adresse, motDePasse.value, nom.value)
           : await synchro.connecterSupabase(adresse, motDePasse.value);
+        // Code d'accès présenté au serveur : s'il est bon, l'accès est immédiat.
+        if (inscription && codeAcces.value.trim() && !profil?.valide) {
+          try {
+            if (await synchro.rejoindreAvecCode(codeAcces.value)) {
+              profil = synchro.supabase.profil;
+            }
+          } catch { /* code refusé : le compte reste en attente */ }
+        }
         surConnexion(profil);
       } catch (e) {
         message.replaceChildren(h('div', { class: 'mauvais' }, e.message));
@@ -284,16 +294,20 @@ export function ecranConnexionServeur(synchro, surConnexion) {
     zone.replaceChildren(h('div', { class: 'carte', style: 'max-width:400px;margin:3rem auto' },
       h('h1', {}, 'Caisse de la tontine'),
       h('p', { class: 'doux' }, inscription
-        ? 'Choisissez une adresse e-mail et un mot de passe. Le tout premier compte créé devient administrateur ; les suivants doivent être approuvés par un administrateur.'
+        ? 'Créez votre compte vous-même. Avec le code d’accès de l’association, vous entrez immédiatement.'
         : 'Connectez-vous avec votre adresse e-mail.'),
       h('form', { onSubmit: (e) => { e.preventDefault(); envoyer(); } },
         inscription
           ? h('div', { style: 'margin-bottom:.7rem' }, h('label', {}, 'Votre nom'), nom)
           : null,
         h('div', { style: 'margin-bottom:.7rem' }, h('label', {}, 'Adresse e-mail'), email),
-        h('div', { style: 'margin-bottom:1rem' },
+        h('div', { style: 'margin-bottom:' + (inscription ? '.7rem' : '1rem') },
           h('label', {}, inscription ? 'Mot de passe (six caractères minimum)' : 'Mot de passe'),
           motDePasse),
+        inscription ? h('div', { style: 'margin-bottom:1rem' },
+          h('label', {}, 'Code d’accès de l’association'), codeAcces,
+          h('p', { class: 'doux', style: 'margin:.3rem 0 0;font-size:.78rem' },
+            'Le code communiqué par le trésorier vous ouvre l’accès immédiatement. Sans lui, votre compte attendra une approbation.')) : null,
         message, bouton),
       h('p', { style: 'margin-top:1rem;text-align:center' },
         h('button', { type: 'button', style: 'border:0;background:none;color:var(--accent);padding:0',
@@ -307,14 +321,37 @@ export function ecranConnexionServeur(synchro, surConnexion) {
 }
 
 /** Compte créé mais pas encore approuvé par un administrateur. */
-export function ecranEnAttente(profil, surDeconnexion) {
+export function ecranEnAttente(profil, surDeconnexion, synchro, surEntree) {
+  const message = h('div');
+  const code = h('input', { type: 'text', autocapitalize: 'characters', autocomplete: 'off' });
+  const bouton = h('button', { class: 'primaire', type: 'submit' }, 'Valider le code');
+
+  const essayer = async () => {
+    if (!code.value.trim()) {
+      return message.replaceChildren(h('div', { class: 'mauvais' }, 'Saisissez le code.'));
+    }
+    bouton.disabled = true; bouton.textContent = 'Vérification…';
+    message.replaceChildren();
+    try {
+      if (await synchro.rejoindreAvecCode(code.value)) return surEntree();
+      message.replaceChildren(h('div', { class: 'mauvais' },
+        'Code incorrect. Demandez-le au trésorier, ou attendez son approbation.'));
+    } catch (e) {
+      message.replaceChildren(h('div', { class: 'mauvais' }, e.message));
+    }
+    bouton.disabled = false; bouton.textContent = 'Valider le code';
+  };
+
   return h('div', {},
     h('div', { class: 'carte', style: 'max-width:440px;margin:3rem auto' },
-      h('h1', {}, 'Compte en attente'),
-      h('p', {}, `Bonjour ${profil?.nom || ''}. Votre compte est bien créé, mais un administrateur doit l’approuver avant que vous puissiez consulter la caisse.`),
-      h('p', { class: 'doux' },
-        'Prévenez l’un des deux administrateurs : l’approbation se fait en un clic depuis leur onglet Réglages.'),
-      h('div', { class: 'barre', style: 'margin-top:1rem' },
+      h('h1', {}, 'Encore une étape'),
+      h('p', {}, `Bonjour ${profil?.nom || ''}. Votre compte est créé. Saisissez le code d’accès de l’association pour entrer tout de suite.`),
+      h('form', { onSubmit: (e) => { e.preventDefault(); essayer(); } },
+        h('div', { style: 'margin-bottom:.8rem' }, h('label', {}, 'Code d’accès'), code),
+        message, bouton),
+      h('p', { class: 'doux', style: 'margin-top:1.2rem' },
+        'Vous ne l’avez pas ? Demandez-le au trésorier — ou attendez qu’un administrateur approuve votre compte depuis son onglet Réglages.'),
+      h('div', { class: 'barre' },
         h('button', { onClick: () => location.reload() }, 'Vérifier à nouveau'),
         h('button', { onClick: surDeconnexion }, 'Se déconnecter'))));
 }

@@ -102,6 +102,13 @@ export class Synchro extends EventTarget {
     return profil;
   }
 
+  async rejoindreAvecCode(code) {
+    const accepte = await this.supabase.rejoindreAvecCode(code);
+    if (accepte) await this.synchroniser();
+    this.prevenir();
+    return accepte;
+  }
+
   async connecterSupabase(email, motDePasse) {
     const profil = await this.supabase.connecter(email, motDePasse);
     this.#activer(this.supabase);
