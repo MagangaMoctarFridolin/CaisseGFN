@@ -45,7 +45,7 @@ let feuilleStyle = '';
 /* ------------------------------------------------------------------ contexte */
 
 function contexte() {
-  const peutEcrire = session?.role === 'admin';
+  const peutEcrire = session?.role === 'admin' && (!surServeur || session?.valide);
   return {
     etat: synchro.etat,
     synchro,
@@ -121,6 +121,14 @@ function rendre() {
       return;
     }
     session = synchro.supabase.profil;
+    // Compte créé mais pas encore approuvé : rien ne doit être visible.
+    if (session && !session.valide) {
+      onglets.hidden = true;
+      app.replaceChildren(Comptes.ecranEnAttente(session, () => {
+        synchro.deconnecter('supabase'); session = null; rendre();
+      }));
+      return;
+    }
   } else {
     /* --- régime « comptes locaux » ------------------------------------ */
     if (!Comptes.comptesDe(etat).length) {

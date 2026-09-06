@@ -230,36 +230,76 @@ function echapper(s) {
  * décidera d'accepter ou de refuser chaque écriture.
  */
 export function ecranConnexionServeur(synchro, surConnexion) {
-  const message = h('div');
-  const email = h('input', { type: 'email', autocapitalize: 'none', autocomplete: 'username' });
-  const motDePasse = h('input', { type: 'password', autocomplete: 'current-password' });
-  const bouton = h('button', { class: 'primaire', type: 'submit',
-    style: 'width:100%;justify-content:center' }, 'Se connecter');
+  let mode = 'connexion';   // ou 'inscription'
+  const zone = h('div');
 
-  const tenter = async () => {
-    bouton.disabled = true;
-    bouton.textContent = 'Connexion…';
-    message.replaceChildren();
-    try {
-      const profil = await synchro.connecterSupabase(email.value, motDePasse.value);
-      surConnexion(profil);
-    } catch (e) {
-      message.replaceChildren(h('div', { class: 'mauvais' }, e.message));
-      bouton.disabled = false;
-      bouton.textContent = 'Se connecter';
-    }
+  const dessiner = () => {
+    const inscription = mode === 'inscription';
+    const message = h('div');
+    const nom = h('input', { type: 'text', autocomplete: 'name' });
+    const email = h('input', { type: 'email', autocapitalize: 'none', autocomplete: 'username' });
+    const motDePasse = h('input', { type: 'password',
+      autocomplete: inscription ? 'new-password' : 'current-password' });
+    const bouton = h('button', { class: 'primaire', type: 'submit',
+      style: 'width:100%;justify-content:center' },
+      inscription ? 'Créer mon compte' : 'Se connecter');
+
+    const envoyer = async () => {
+      if (inscription && motDePasse.value.length < 6) {
+        return message.replaceChildren(h('div', { class: 'mauvais' },
+          'Mot de passe trop court : six caractères au minimum.'));
+      }
+      bouton.disabled = true;
+      bouton.textContent = inscription ? 'Création…' : 'Connexion…';
+      message.replaceChildren();
+      try {
+        const profil = inscription
+          ? await synchro.inscrireSupabase(email.value, motDePasse.value, nom.value)
+          : await synchro.connecterSupabase(email.value, motDePasse.value);
+        surConnexion(profil);
+      } catch (e) {
+        message.replaceChildren(h('div', { class: 'mauvais' }, e.message));
+        bouton.disabled = false;
+        bouton.textContent = inscription ? 'Créer mon compte' : 'Se connecter';
+      }
+    };
+
+    zone.replaceChildren(h('div', { class: 'carte', style: 'max-width:400px;margin:3rem auto' },
+      h('h1', {}, 'Caisse de la tontine'),
+      h('p', { class: 'doux' }, inscription
+        ? 'Choisissez une adresse e-mail et un mot de passe. Le tout premier compte créé devient administrateur ; les suivants doivent être approuvés par un administrateur.'
+        : 'Connectez-vous avec votre adresse e-mail.'),
+      h('form', { onSubmit: (e) => { e.preventDefault(); envoyer(); } },
+        inscription
+          ? h('div', { style: 'margin-bottom:.7rem' }, h('label', {}, 'Votre nom'), nom)
+          : null,
+        h('div', { style: 'margin-bottom:.7rem' }, h('label', {}, 'Adresse e-mail'), email),
+        h('div', { style: 'margin-bottom:1rem' },
+          h('label', {}, inscription ? 'Mot de passe (six caractères minimum)' : 'Mot de passe'),
+          motDePasse),
+        message, bouton),
+      h('p', { style: 'margin-top:1rem;text-align:center' },
+        h('button', { type: 'button', style: 'border:0;background:none;color:var(--accent);padding:0',
+          onClick: () => { mode = inscription ? 'connexion' : 'inscription'; dessiner(); } },
+          inscription ? 'J’ai déjà un compte — se connecter'
+                      : 'Première fois ici — créer mon compte'))));
   };
 
+  dessiner();
+  return zone;
+}
+
+/** Compte créé mais pas encore approuvé par un administrateur. */
+export function ecranEnAttente(profil, surDeconnexion) {
   return h('div', {},
-    h('div', { class: 'carte', style: 'max-width:400px;margin:3rem auto' },
-      h('h1', {}, 'Caisse de la tontine'),
-      h('p', { class: 'doux' }, 'Connectez-vous avec l’adresse e-mail de votre compte.'),
-      h('form', { onSubmit: (e) => { e.preventDefault(); tenter(); } },
-        h('div', { style: 'margin-bottom:.7rem' }, h('label', {}, 'Adresse e-mail'), email),
-        h('div', { style: 'margin-bottom:1rem' }, h('label', {}, 'Mot de passe'), motDePasse),
-        message, bouton),
-      h('p', { class: 'doux', style: 'margin-top:1rem' },
-        'Vous n’avez pas de compte ? Demandez à un administrateur de vous en créer un.')));
+    h('div', { class: 'carte', style: 'max-width:440px;margin:3rem auto' },
+      h('h1', {}, 'Compte en attente'),
+      h('p', {}, `Bonjour ${profil?.nom || ''}. Votre compte est bien créé, mais un administrateur doit l’approuver avant que vous puissiez consulter la caisse.`),
+      h('p', { class: 'doux' },
+        'Prévenez l’un des deux administrateurs : l’approbation se fait en un clic depuis leur onglet Réglages.'),
+      h('div', { class: 'barre', style: 'margin-top:1rem' },
+        h('button', { onClick: () => location.reload() }, 'Vérifier à nouveau'),
+        h('button', { onClick: surDeconnexion }, 'Se déconnecter'))));
 }
 
 /** Liste des comptes du serveur, dans les Réglages. */
@@ -276,22 +316,37 @@ export function blocComptesServeur(ctx) {
           { valeur: 'admin', libelle: 'Administrateur' }] },
         { cle: 'adherent_id', libelle: 'Fiche adhérent associée', type: 'select',
           valeur: p.adherent_id || '', options: [{ valeur: '', libelle: '— non liée —' },
-            ...ctx.etat.adherents.map((a) => ({ valeur: a.id, libelle: DB.nomComplet(a) }))] }
+            ...ctx.etat.adherents.map((a) => ({ valeur: a.id, libelle: DB.nomComplet(a) }))] },
+        { cle: 'valide', libelle: 'Accès', type: 'select', valeur: p.valide ? 'oui' : 'non',
+          options: [{ valeur: 'oui', libelle: 'Autorisé' }, { valeur: 'non', libelle: 'Suspendu' }] }
       ], async (v) => {
         try {
-          await synchro.supabase.majProfil({ ...p, ...v });
+          await synchro.supabase.majProfil({ ...p, ...v, valide: v.valide === 'oui' });
           toast('Compte mis à jour.');
           charger();
         } catch (e) { toast(e.message); }
       });
 
+      const valider = async () => {
+        try {
+          await synchro.supabase.majProfil({ ...p, valide: true });
+          toast(p.nom + ' a maintenant accès.');
+          charger();
+        } catch (e) { toast(e.message); }
+      };
+
       return h('tr', {},
         h('td', {}, p.nom, p.id === session?.id ? h('span', { class: 'doux' }, ' (vous)') : null),
-        h('td', {}, h('span', { class: 'etiquette' + (p.role === 'admin' ? '' : ' attente') },
-          p.role === 'admin' ? 'administrateur' : 'consultation')),
+        h('td', {}, !p.valide
+          ? h('span', { class: 'etiquette retard' }, 'en attente')
+          : h('span', { class: 'etiquette' + (p.role === 'admin' ? '' : ' attente') },
+              p.role === 'admin' ? 'administrateur' : 'consultation')),
         h('td', { class: 'doux' }, p.adherent_id
           ? DB.nomComplet(ctx.etat.adherents.find((a) => a.id === p.adherent_id)) : '—'),
-        h('td', { style: 'text-align:right' },
+        h('td', { style: 'text-align:right;white-space:nowrap' },
+          ctx.peutEcrire && !p.valide
+            ? h('button', { class: 'primaire', onClick: valider }, 'Approuver') : null,
+          ' ',
           ctx.peutEcrire ? h('button', { onClick: changerRole }, 'Modifier') : null));
     }));
     if (!profils.length) {
@@ -312,19 +367,11 @@ export function blocComptesServeur(ctx) {
   return h('div', { class: 'carte' },
     h('h2', {}, 'Comptes'),
     h('p', { class: 'doux' },
-      'Les droits sont appliqués par le serveur : un compte en consultation se voit refuser toute écriture, même si quelqu’un modifiait la page dans son navigateur.'),
+      'Chacun crée son compte depuis l’écran de connexion, puis vous l’approuvez ici. Les droits sont appliqués par le serveur : un compte en consultation se voit refuser toute écriture, même si quelqu’un modifiait la page dans son navigateur.'),
     h('div', { class: 'defilable' }, h('table', {},
       h('thead', {}, h('tr', {},
         h('th', {}, 'Nom'), h('th', {}, 'Rôle'), h('th', {}, 'Fiche adhérent'), h('th', {}, ''))),
       corps)),
-    ctx.peutEcrire ? h('details', { style: 'margin-top:.9rem' },
-      h('summary', { class: 'doux', style: 'cursor:pointer' }, 'Ajouter un compte'),
-      h('div', { class: 'doux', style: 'margin-top:.6rem;line-height:1.7' },
-        h('p', {}, 'La création d’un compte se fait dans Supabase, pour que le mot de passe ne transite jamais par l’application :'),
-        h('p', {}, '1. Ouvrez votre projet Supabase → ', h('b', {}, 'Authentication'), ' → ',
-          h('b', {}, 'Users'), ' → ', h('b', {}, 'Add user'), ' → ', h('b', {}, 'Create new user'), '.'),
-        h('p', {}, '2. Saisissez l’adresse e-mail et un mot de passe, et cochez ',
-          h('b', {}, 'Auto Confirm User'), '.'),
-        h('p', {}, '3. Revenez ici et rechargez : le compte apparaît en consultation. Cliquez sur ',
-          h('b', {}, 'Modifier'), ' pour le passer administrateur si nécessaire.'))) : null);
+    ctx.peutEcrire ? h('p', { class: 'doux', style: 'margin-top:.9rem' },
+      'Pour ajouter quelqu’un : donnez-lui l’adresse de l’application, il crée son compte lui-même en cliquant sur « Première fois ici », puis vous l’approuvez dans la liste ci-dessus.') : null);
 }

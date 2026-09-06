@@ -70,7 +70,14 @@ export class Synchro extends EventTarget {
     this.recalculer();
 
     // 2. Destinations déjà autorisées lors d'une session précédente.
-    if (this.supabase.disponible() && this.supabase.estConnecte()) this.#activer(this.supabase);
+    if (this.supabase.disponible() && this.supabase.estConnecte()) {
+      this.#activer(this.supabase);
+      // Le rôle et l'autorisation d'accès peuvent avoir changé depuis la
+      // dernière fois : on les relit AVANT le premier affichage, sinon un
+      // compte fraîchement approuvé resterait bloqué sur l'écran d'attente.
+      try { await this.supabase.chargerProfil(); }
+      catch (e) { this.erreur = e.message; }
+    }
     if (this.graph.disponible()) {
       try {
         if (await this.graph.terminerConnexion() || this.graph.estConnecte()) this.#activer(this.graph);
@@ -86,6 +93,13 @@ export class Synchro extends EventTarget {
     await this.dossier.connecter();
     this.#activer(this.dossier);
     await this.synchroniser();
+  }
+
+  async inscrireSupabase(email, motDePasse, nom) {
+    const profil = await this.supabase.inscrire(email, motDePasse, nom);
+    this.#activer(this.supabase);
+    await this.synchroniser();
+    return profil;
   }
 
   async connecterSupabase(email, motDePasse) {

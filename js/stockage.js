@@ -302,7 +302,10 @@ export class StockageSupabase {
   disponible() { return !!(this.url && this.cle); }
   estConnecte() { return !!this.session; }
   etiquette() {
-    return this.profil ? `Supabase — ${this.profil.nom} (${this.profil.role})` : 'Supabase';
+    if (!this.profil) return 'Base en ligne';
+    const r = !this.profil.valide ? 'en attente'
+      : this.profil.role === 'admin' ? 'administrateur' : 'consultation';
+    return `Base en ligne — ${this.profil.nom} (${r})`;
   }
 
   /* ------------------------------------------------------- session locale */
@@ -333,6 +336,40 @@ export class StockageSupabase {
   }
 
   /* ------------------------------------------------------ authentification */
+
+  /**
+   * Inscription depuis l'application, sans passer par le tableau de bord.
+   * Le tout premier compte cree devient administrateur (c'est la base qui le
+   * decide) ; les suivants arrivent en attente d'approbation.
+   */
+  async inscrire(email, motDePasse, nom) {
+    const r = await fetch(`${this.url}/auth/v1/signup`, {
+      method: 'POST',
+      headers: { apikey: this.cle, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: (email || '').trim(), password: motDePasse,
+        data: { nom: (nom || '').trim() }
+      })
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const m = j.error_description || j.msg || j.message || '';
+      if (/already registered|already exists/i.test(m)) {
+        throw new Error('Cette adresse a déjà un compte. Utilisez « Se connecter ».');
+      }
+      if (/password/i.test(m) && /least|court|short/i.test(m)) {
+        throw new Error('Mot de passe trop court : six caractères au minimum.');
+      }
+      throw new Error(m || "Inscription impossible pour l'instant.");
+    }
+    if (!j.access_token) {
+      // Cas d'une confirmation par e-mail encore exigee cote serveur.
+      throw new Error("Compte créé. Confirmez l'adresse par l'e-mail reçu, puis connectez-vous.");
+    }
+    this.#garder(j);
+    await this.chargerProfil();
+    return this.profil;
+  }
 
   async connecter(email, motDePasse) {
     const r = await fetch(`${this.url}/auth/v1/token?grant_type=password`, {
@@ -385,11 +422,11 @@ export class StockageSupabase {
   async chargerProfil() {
     const id = this.session?.utilisateur?.id;
     if (!id) return null;
-    const r = await this.#appel(`/rest/v1/profils?select=id,nom,role,adherent_id&id=eq.${id}`);
+    const r = await this.#appel(`/rest/v1/profils?select=id,nom,role,adherent_id,valide&id=eq.${id}`);
     const lignes = await r.json();
     this.profil = lignes[0] || {
-      id, nom: this.session.utilisateur.email, role: 'adherent',
-      manquant: true   // aucun profil créé : traité comme simple lecteur
+      id, nom: this.session.utilisateur.email, role: 'adherent', valide: false,
+      manquant: true   // aucun profil : traité comme un compte en attente
     };
     localStorage.setItem('tontine:supabase:profil', JSON.stringify(this.profil));
     return this.profil;
@@ -432,7 +469,7 @@ export class StockageSupabase {
 
   /** Liste des comptes, pour l'écran Réglages. */
   async listerProfils() {
-    const r = await this.#appel('/rest/v1/profils?select=id,nom,role,adherent_id&order=nom.asc');
+    const r = await this.#appel('/rest/v1/profils?select=id,nom,role,adherent_id,valide&order=nom.asc');
     return r.json();
   }
 
@@ -440,7 +477,8 @@ export class StockageSupabase {
     await this.#appel(`/rest/v1/profils?id=eq.${profil.id}`, {
       method: 'PATCH',
       headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({ nom: profil.nom, role: profil.role, adherent_id: profil.adherent_id || null })
+      body: JSON.stringify({ nom: profil.nom, role: profil.role,
+                             adherent_id: profil.adherent_id || null, valide: !!profil.valide })
     });
   }
 }
