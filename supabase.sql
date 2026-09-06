@@ -228,7 +228,7 @@ alter table public.evenements add constraint evenements_auteur_fkey
   foreign key (auteur) references auth.users (id) on delete set null;
 
 create or replace function public.supprimer_compte(cible uuid)
-returns void language plpgsql security definer set search_path = public as $
+returns void language plpgsql security definer set search_path = public as $$
 declare nb_admins int;
 begin
   if not public.est_admin() then raise exception 'reserve aux administrateurs'; end if;
@@ -238,14 +238,14 @@ begin
     raise exception 'il doit rester au moins un administrateur';
   end if;
   delete from auth.users where id = cible;
-end; $;
+end; $$;
 
 revoke all on function public.supprimer_compte(uuid) from public, anon;
 grant execute on function public.supprimer_compte(uuid) to authenticated;
 
 -- Un compte bloqué ne se débloque pas tout seul avec le code d'accès.
 create or replace function public.rejoindre(code text)
-returns boolean language plpgsql security definer set search_path = public as $
+returns boolean language plpgsql security definer set search_path = public as $$
 declare attendu text;
 begin
   if auth.uid() is null then return false; end if;
@@ -256,5 +256,4 @@ begin
   if code is null or lower(btrim(code)) <> lower(btrim(attendu)) then return false; end if;
   update public.profils set valide = true where id = auth.uid();
   return true;
-end; $;
-
+end; $$;
