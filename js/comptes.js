@@ -342,6 +342,20 @@ export function ecranEnAttente(profil, surDeconnexion, synchro, surEntree) {
     bouton.disabled = false; bouton.textContent = 'Valider le code';
   };
 
+  // Compte bloqué par un administrateur : pas de code qui tienne, seul un
+  // administrateur peut rendre l'accès.
+  if (profil?.bloque) {
+    return h('div', {},
+      h('div', { class: 'carte', style: 'max-width:440px;margin:3rem auto' },
+        h('h1', {}, 'Accès suspendu'),
+        h('p', {}, `Bonjour ${profil?.nom || ''}. Votre accès a été suspendu par un administrateur.`),
+        h('p', { class: 'doux' },
+          'Rapprochez-vous du trésorier : lui seul peut rouvrir l’accès, depuis son onglet Réglages.'),
+        h('div', { class: 'barre' },
+          h('button', { onClick: () => location.reload() }, 'Vérifier à nouveau'),
+          h('button', { onClick: surDeconnexion }, 'Se déconnecter'))));
+  }
+
   return h('div', {},
     h('div', { class: 'carte', style: 'max-width:440px;margin:3rem auto' },
       h('h1', {}, 'Encore une étape'),
@@ -375,33 +389,68 @@ export function blocComptesServeur(ctx) {
           options: [{ valeur: 'oui', libelle: 'Autorisé' }, { valeur: 'non', libelle: 'Suspendu' }] }
       ], async (v) => {
         try {
-          await synchro.supabase.majProfil({ ...p, ...v, valide: v.valide === 'oui' });
+          const ouvert = v.valide === 'oui';
+          await synchro.supabase.majProfil({ ...p, ...v, valide: ouvert,
+            bloque: ouvert ? false : (p.valide ? true : !!p.bloque) });
           toast('Compte mis à jour.');
           charger();
         } catch (e) { toast(e.message); }
       });
 
-      const valider = async () => {
+      const ecrire = async (champs, message) => {
         try {
-          await synchro.supabase.majProfil({ ...p, valide: true });
-          toast(p.nom + ' a maintenant accès.');
+          await synchro.supabase.majProfil({ ...p, ...champs });
+          toast(message);
           charger();
         } catch (e) { toast(e.message); }
       };
 
+      // Approuver / bloquer / débloquer : trois gestes, un seul champ de
+      // vérité côté serveur — « valide ». « bloque » ne sert qu'à distinguer,
+      // dans la liste, celui qui n'est pas encore approuvé de celui à qui on a
+      // retiré l'accès.
+      const valider   = () => ecrire({ valide: true,  bloque: false },
+                                     p.nom + ' a maintenant accès.');
+      const debloquer = () => ecrire({ valide: true,  bloque: false },
+                                     p.nom + ' retrouve son accès.');
+      const bloquer   = async () => {
+        if (!await confirmer(`Bloquer ${p.nom} ?`,
+          "Son compte reste enregistré mais il ne verra plus rien tant que vous ne l'aurez pas débloqué."))
+          return;
+        ecrire({ valide: false, bloque: true }, p.nom + ' est bloqué.');
+      };
+
+      const supprimer = async () => {
+        if (!await confirmer(`Supprimer définitivement le compte de ${p.nom} ?`,
+          "Le compte et son mot de passe disparaissent. Les saisies déjà faites restent dans l'historique. Cette action est irréversible."))
+          return;
+        try {
+          await synchro.supabase.supprimerCompte(p.id);
+          toast('Compte supprimé.');
+          charger();
+        } catch (e) { toast(e.message); }
+      };
+
+      const soi = p.id === session?.id;
+      const etat = p.bloque ? h('span', { class: 'etiquette retard' }, 'bloqué')
+        : !p.valide ? h('span', { class: 'etiquette attente' }, 'en attente')
+        : h('span', { class: 'etiquette' + (p.role === 'admin' ? '' : ' attente') },
+            p.role === 'admin' ? 'administrateur' : 'consultation');
+
       return h('tr', {},
-        h('td', {}, p.nom, p.id === session?.id ? h('span', { class: 'doux' }, ' (vous)') : null),
-        h('td', {}, !p.valide
-          ? h('span', { class: 'etiquette retard' }, 'en attente')
-          : h('span', { class: 'etiquette' + (p.role === 'admin' ? '' : ' attente') },
-              p.role === 'admin' ? 'administrateur' : 'consultation')),
+        h('td', {}, p.nom, soi ? h('span', { class: 'doux' }, ' (vous)') : null),
+        h('td', {}, etat),
         h('td', { class: 'doux' }, p.adherent_id
           ? DB.nomComplet(ctx.etat.adherents.find((a) => a.id === p.adherent_id)) : '—'),
-        h('td', { style: 'text-align:right;white-space:nowrap' },
-          ctx.estAdmin && !p.valide
-            ? h('button', { class: 'primaire', onClick: valider }, 'Approuver') : null,
-          ' ',
-          ctx.estAdmin ? h('button', { onClick: changerRole }, 'Modifier') : null));
+        h('td', { class: 'actions-compte', style: 'text-align:right;white-space:nowrap' },
+          ...(!ctx.estAdmin ? [] : [
+            !p.valide && !p.bloque
+              ? h('button', { class: 'primaire', onClick: valider }, 'Approuver') : null,
+            p.bloque ? h('button', { class: 'primaire', onClick: debloquer }, 'Débloquer') : null,
+            p.valide && !soi ? h('button', { onClick: bloquer }, 'Bloquer') : null,
+            h('button', { onClick: changerRole }, 'Modifier'),
+            soi ? null : h('button', { class: 'danger', onClick: supprimer }, 'Supprimer')
+          ])));
     }));
     if (!profils.length) {
       corps.replaceChildren(h('tr', {}, h('td', { colspan: 4, class: 'doux' },
