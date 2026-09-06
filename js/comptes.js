@@ -201,6 +201,9 @@ body{padding:0}main{max-width:1000px;margin:0 auto;padding:1rem}
 </style></head><body>
 <div class="bandeau"><h1>${echapper(etat.association.nom)}</h1>
 <p>Situation au ${new Date().toLocaleDateString('fr-FR')} — document de consultation, non modifiable</p></div>
+${etat.association.airtelMoney ? `<div style="background:var(--accent-clair);padding:.8rem 1rem;text-align:center">
+<span style="font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--accent)">Cotisations par Airtel Money</span>
+<div style="font-size:1.5rem;font-weight:700;color:var(--accent)">${echapper(etat.association.airtelMoney)}</div></div>` : ''}
 <main>
 <div class="grille" style="margin-bottom:1rem">
   <div class="stat"><div class="libelle">Cotisations ${annee}</div><div class="valeur">${nb(t.totalCotisations)} ${dev}</div></div>
@@ -358,10 +361,10 @@ export function blocComptesServeur(ctx) {
         h('td', { class: 'doux' }, p.adherent_id
           ? DB.nomComplet(ctx.etat.adherents.find((a) => a.id === p.adherent_id)) : '—'),
         h('td', { style: 'text-align:right;white-space:nowrap' },
-          ctx.peutEcrire && !p.valide
+          ctx.estAdmin && !p.valide
             ? h('button', { class: 'primaire', onClick: valider }, 'Approuver') : null,
           ' ',
-          ctx.peutEcrire ? h('button', { onClick: changerRole }, 'Modifier') : null));
+          ctx.estAdmin ? h('button', { onClick: changerRole }, 'Modifier') : null));
     }));
     if (!profils.length) {
       corps.replaceChildren(h('tr', {}, h('td', { colspan: 4, class: 'doux' },
@@ -386,6 +389,6 @@ export function blocComptesServeur(ctx) {
       h('thead', {}, h('tr', {},
         h('th', {}, 'Nom'), h('th', {}, 'Rôle'), h('th', {}, 'Fiche adhérent'), h('th', {}, ''))),
       corps)),
-    ctx.peutEcrire ? h('p', { class: 'doux', style: 'margin-top:.9rem' },
+    ctx.estAdmin ? h('p', { class: 'doux', style: 'margin-top:.9rem' },
       'Pour ajouter quelqu’un : donnez-lui l’adresse de l’application, il crée son compte lui-même en cliquant sur « Première fois ici », puis vous l’approuvez dans la liste ci-dessus.') : null);
 }

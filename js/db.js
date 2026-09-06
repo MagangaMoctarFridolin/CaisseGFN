@@ -20,7 +20,8 @@ export const ETAT_VIDE = () => ({
   version: 1,
   association: {
     nom: 'LA GRANDE FAMILLE NIELILI', adresse: 'Libreville',
-    telephone: '', email: '', anneeDemarrage: new Date().getFullYear(), devise: 'FCFA'
+    telephone: '', email: '', airtelMoney: '',
+    anneeDemarrage: new Date().getFullYear(), devise: 'FCFA'
   },
   adherents: [], cotisations: [], prets: [], mouvements: [], comptes: []
 });

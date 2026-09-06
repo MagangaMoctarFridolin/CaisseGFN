@@ -112,6 +112,14 @@ export function vueTableauBord(ctx) {
         ? stat('Remboursements en retard', retards.length, true)
         : stat('Adhérents actifs', t.nbAdherents)),
 
+    etat.association.airtelMoney ? h('div', { class: 'carte',
+      style: 'background:var(--accent-clair);border-color:transparent' },
+      h('div', { style: 'display:flex;flex-wrap:wrap;align-items:baseline;gap:.2rem 1rem' },
+        h('span', { style: 'font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--accent)' },
+          'Cotisations par Airtel Money'),
+        h('span', { style: 'font-size:1.5rem;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums' },
+          etat.association.airtelMoney))) : null,
+
     h('div', { class: 'carte' },
       h('h2', {}, 'Cotisations par mois — ' + annee),
       mois.every((m) => !m)
@@ -300,7 +308,7 @@ export function vueCotisations(ctx) {
         'Total ' + annee + ' : ' + fmtMontant(totauxMois.reduce((s, x) => s + x, 0), dev))),
     h('p', { class: 'doux', style: 'margin-top:-.4rem' }, ctx.peutEcrire
       ? 'Cliquez dans une case pour saisir un montant. Laissez vide pour un mois non cotisé.'
-      : 'Consultation seule : seuls les administrateurs peuvent modifier ces montants.'),
+      : 'Consultation seule : votre compte n’a pas le droit de modifier ces montants.'),
     adherents.length === 0
       ? h('div', { class: 'carte' }, h('p', { class: 'vide' }, 'Ajoutez d’abord des adhérents.'))
       : h('div', { class: 'carte' }, h('div', { class: 'defilable' },
@@ -563,13 +571,14 @@ function exporterJSON(etat) {
 export function vueReglages(ctx) {
   const { etat, synchro } = ctx;
   const assoc = etat.association;
-  const admin = ctx.peutEcrire;
+  const admin = ctx.estAdmin;
 
   const modifierAssoc = () => formulaire("Informations de l'association", [
     { cle: 'nom', libelle: 'Nom', valeur: assoc.nom, requis: true },
     { cle: 'adresse', libelle: 'Adresse du siège', valeur: assoc.adresse },
     { cle: 'telephone', libelle: 'Téléphone', valeur: assoc.telephone },
     { cle: 'email', libelle: 'E-mail', valeur: assoc.email },
+    { cle: 'airtelMoney', libelle: 'Numéro Airtel Money (cotisations)', valeur: assoc.airtelMoney },
     { cle: 'devise', libelle: 'Devise', valeur: assoc.devise }
   ], (v) => ctx.enregistrer('association', 'upsert', v));
 
@@ -588,11 +597,24 @@ export function vueReglages(ctx) {
       e.target.value = '';
     } });
 
+  const baseVide = etat.adherents.length === 0 && etat.cotisations.length === 0;
+
   return h('div', {},
     h('div', { class: 'barre' },
       h('h1', {}, 'Réglages'),
-      h('span', { class: 'doux pousse' },
-        ctx.session ? `Connecté : ${ctx.session.nom} (${admin ? 'administrateur' : 'consultation'})` : '')),
+      h('span', { class: 'doux pousse' }, ctx.session
+        ? `Connecté : ${ctx.session.nom} (${admin ? 'administrateur' : 'adhérent'})` : '')),
+
+    baseVide && admin ? h('div', { class: 'carte',
+      style: 'border-color:var(--ambre);background:var(--ambre-clair)' },
+      h('h2', { style: 'color:var(--ambre)' }, 'Reprendre les données du classeur'),
+      h('p', { style: 'color:var(--ambre)' },
+        'La base est encore vide. Les 402 000 FCFA de 2023 et les onze adhérents attendent dans le fichier de reprise, à importer une seule fois.'),
+      h('p', { class: 'doux' },
+        'Le fichier est dans le dossier Tontine-App, sous donnees/journal/ev-reprise-excel.jsonl. Une fois importé, tous les appareils le recevront.'),
+      h('div', { class: 'barre' },
+        h('button', { class: 'primaire', onClick: () => zoneImport.click() },
+          'Importer le fichier de reprise'))) : null,
 
     ctx.blocComptes ? ctx.blocComptes(ctx) : null,
 
@@ -611,7 +633,7 @@ export function vueReglages(ctx) {
           h('span', { class: 'etiquette', style: 'margin-left:.4rem' }, 'actif'))),
         !relie ? h('li', {}, 'Aucune destination distante : rien ne quitte cet appareil.') : null),
       h('div', { class: 'barre' },
-        synchro.dossier.disponible() && !dossierRelie
+        admin && synchro.dossier.disponible() && !dossierRelie
           ? h('button', { class: relie ? '' : 'primaire', onClick: async () => {
               try { await synchro.connecterDossier(); toast('Dossier OneDrive relié.'); }
               catch (e) { toast(e.message); } } },
@@ -623,7 +645,7 @@ export function vueReglages(ctx) {
         `Appareil : ${synchro.nomAppareil} · ${synchro.nbEvenements} écritures dans l'historique` +
         (synchro.nbEnAttente ? ` · ${synchro.nbEnAttente} en attente d'envoi` : '') +
         (synchro.derniereSynchro ? ` · dernière synchro à ${synchro.derniereSynchro.toLocaleTimeString('fr-FR')}` : '')),
-      ctx.surServeur && !dossierRelie && synchro.dossier.disponible()
+      admin && ctx.surServeur && !dossierRelie && synchro.dossier.disponible()
         ? h('div', { class: 'avert' },
             'Sur le PC, reliez aussi le dossier OneDrive : la base en ligne fait circuler les saisies entre les appareils, et OneDrive en garde la copie complète et lisible.')
         : null,
@@ -632,7 +654,8 @@ export function vueReglages(ctx) {
     bloc('Association',
       h('table', {}, h('tbody', {},
         [['Nom', assoc.nom], ['Siège', assoc.adresse], ['Téléphone', assoc.telephone || '—'],
-         ['E-mail', assoc.email || '—'], ['Devise', assoc.devise]].map(([k, v]) =>
+         ['E-mail', assoc.email || '—'],
+         ['Airtel Money', assoc.airtelMoney || '—'], ['Devise', assoc.devise]].map(([k, v]) =>
           h('tr', {}, h('td', { class: 'doux' }, k), h('td', {}, v))))),
       admin ? h('div', { class: 'barre', style: 'margin-top:.8rem' },
         h('button', { onClick: modifierAssoc }, 'Modifier')) : null),

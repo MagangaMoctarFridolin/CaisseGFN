@@ -49,19 +49,27 @@ let ecranAuth = null;
 /* ------------------------------------------------------------------ contexte */
 
 function contexte() {
-  const peutEcrire = session?.role === 'admin' && (!surServeur || session?.valide);
+  // Deux niveaux séparés :
+  //  • peutEcrire  → saisir les cotisations, prêts, comptabilité, adhérents.
+  //                  Accordé à TOUT compte approuvé, adhérents compris.
+  //  • estAdmin    → gérer les comptes, l'association, le dossier OneDrive.
+  //                  Réservé aux administrateurs.
+  const approuve = surServeur ? !!session?.valide : !!session;
+  const peutEcrire = surServeur ? approuve : session?.role === 'admin';
+  const estAdmin = session?.role === 'admin' && approuve;
   return {
     etat: synchro.etat,
     synchro,
     session,
     annee,
     peutEcrire,
+    estAdmin,
     surServeur,
     setAnnee(a) { annee = a; anneeChoisie = true; localStorage.setItem('tontine:annee', a); rendre(); },
     rafraichir: rendre,
     blocComptes: surServeur
       ? Comptes.blocComptesServeur
-      : (peutEcrire ? Comptes.blocComptes : null),
+      : (estAdmin ? Comptes.blocComptes : null),
     deconnexion() {
       if (surServeur) synchro.deconnecter('supabase');
       else Comptes.fermerSession();
@@ -70,7 +78,7 @@ function contexte() {
       rendre();
     },
     async enregistrer(entite, type, donnees) {
-      if (!peutEcrire) return toast('Consultation seule : vous ne pouvez pas modifier les données.');
+      if (!peutEcrire) return toast('Votre compte n’a pas le droit de modifier les données.');
       try { await synchro.enregistrer(entite, type, donnees); }
       catch (e) { toast('Erreur : ' + e.message); }
     },
