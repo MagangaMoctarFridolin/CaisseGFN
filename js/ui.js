@@ -77,15 +77,33 @@ export function formulaire(titre, champs, surValider) {
   setTimeout(() => grille.querySelector('input,select,textarea')?.focus(), 30);
 }
 
-export function confirmer(message, surOui) {
-  const d = h('dialog', {},
-    h('div', { class: 'corps' }, h('p', { style: 'margin:0' }, message)),
-    h('div', { class: 'pied' },
-      h('button', { onClick: () => d.close() }, 'Annuler'),
-      h('button', { class: 'primaire', onClick: () => { d.close(); surOui(); } }, 'Confirmer')));
-  document.body.append(d);
-  d.addEventListener('close', () => d.remove());
-  d.showModal();
+/**
+ * Demande une confirmation. Deux usages possibles :
+ *   confirmer('Supprimer ?', () => …)            — à l'ancienne, par rappel
+ *   if (await confirmer('Supprimer ?', 'détail')) — par promesse
+ */
+export function confirmer(message, surOuiOuDetail, detail) {
+  const surOui = typeof surOuiOuDetail === 'function' ? surOuiOuDetail : null;
+  const explication = typeof surOuiOuDetail === 'string' ? surOuiOuDetail : detail;
+  return new Promise((resolve) => {
+    let repondu = false;
+    const finir = (oui) => {
+      if (repondu) return;
+      repondu = true;
+      resolve(oui);
+      if (oui && surOui) surOui();
+    };
+    const d = h('dialog', {},
+      h('div', { class: 'corps' },
+        h('p', { style: 'margin:0' }, message),
+        explication ? h('p', { class: 'doux', style: 'margin:.6rem 0 0' }, explication) : null),
+      h('div', { class: 'pied' },
+        h('button', { onClick: () => d.close() }, 'Annuler'),
+        h('button', { class: 'primaire', onClick: () => { finir(true); d.close(); } }, 'Confirmer')));
+    document.body.append(d);
+    d.addEventListener('close', () => { finir(false); d.remove(); });
+    d.showModal();
+  });
 }
 
 /* ========================================================== tableau de bord === */
