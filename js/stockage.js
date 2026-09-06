@@ -421,6 +421,11 @@ export class StockageSupabase {
     });
     if (!r.ok) {
       const texte = await r.text().catch(() => '');
+      // Un refus posé par une fonction du serveur (raise exception) arrive avec
+      // son message en français : on le montre tel quel, il est plus parlant.
+      let motif = '';
+      try { motif = (JSON.parse(texte).message || '').trim(); } catch { /* pas du JSON */ }
+      if (motif && !/row-level security/i.test(motif)) throw new Error(motif);
       if (r.status === 401 || r.status === 403 || /row-level security/i.test(texte)) {
         throw new Error("Écriture refusée par le serveur : ce compte est en consultation seule.");
       }
@@ -432,7 +437,7 @@ export class StockageSupabase {
   async chargerProfil() {
     const id = this.session?.utilisateur?.id;
     if (!id) return null;
-    const r = await this.#appel(`/rest/v1/profils?select=id,nom,role,adherent_id,valide&id=eq.${id}`);
+    const r = await this.#appel(`/rest/v1/profils?select=id,nom,role,adherent_id,valide,bloque&id=eq.${id}`);
     const lignes = await r.json();
     this.profil = lignes[0] || {
       id, nom: this.session.utilisateur.email, role: 'adherent', valide: false,
@@ -510,7 +515,7 @@ export class StockageSupabase {
 
   /** Liste des comptes, pour l'écran Réglages. */
   async listerProfils() {
-    const r = await this.#appel('/rest/v1/profils?select=id,nom,role,adherent_id,valide&order=nom.asc');
+    const r = await this.#appel('/rest/v1/profils?select=id,nom,role,adherent_id,valide,bloque&order=nom.asc');
     return r.json();
   }
 
@@ -519,7 +524,20 @@ export class StockageSupabase {
       method: 'PATCH',
       headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({ nom: profil.nom, role: profil.role,
-                             adherent_id: profil.adherent_id || null, valide: !!profil.valide })
+                             adherent_id: profil.adherent_id || null,
+                             valide: !!profil.valide, bloque: !!profil.bloque })
+    });
+  }
+
+  /**
+   * Suppression définitive d'un compte. C'est le serveur qui décide :
+   * réservé aux administrateurs, interdit sur son propre compte, et interdit
+   * s'il ne resterait plus aucun administrateur. Le journal des écritures
+   * n'est pas touché — les saisies de la personne restent, sans auteur.
+   */
+  async supprimerCompte(id) {
+    await this.#appel('/rest/v1/rpc/supprimer_compte', {
+      method: 'POST', body: JSON.stringify({ cible: id })
     });
   }
 }
