@@ -30,64 +30,33 @@ l'historique.
 
 ---
 
-## 2. Mise en place de la base en ligne (une seule fois)
+## 2. Créer votre compte
 
-### 2.1 Créer le projet
+**Tout se fait depuis l'application. Vous n'avez plus rien à faire dans le
+tableau de bord Supabase.**
 
-1. **supabase.com** → *Start your project* → connexion avec **GitHub**
-2. *New project* : nom `caisse-gfn`, mot de passe de base généré et **noté**,
-   région **Central EU (Frankfurt)** ou **West EU (London)**
-3. Attendre la fin de la création (1 à 2 minutes)
+1. Ouvrez **https://magangamoctarfridolin.github.io/CaisseGFN/**
+2. Cliquez sur **« Première fois ici — créer mon compte »**
+3. Saisissez votre nom, votre adresse e-mail et un mot de passe
+   (six caractères minimum)
+4. **Créer mon compte**
 
-### 2.2 Créer les tables et les règles de sécurité
+Le tout premier compte créé devient **administrateur** et a accès
+immédiatement. C'est donc à vous de le créer en premier.
 
-1. Menu **SQL Editor** → *New query*
-2. Coller tout le contenu du fichier **`supabase.sql`** fourni
-3. **Run**
+### Ajouter quelqu'un ensuite
 
-Ce script crée le journal des écritures, la table des comptes, et surtout les
-règles : *tout compte connecté peut lire, seuls les administrateurs peuvent
-écrire*. Ces règles sont appliquées par le serveur.
+Donnez-lui simplement l'adresse de l'application. Il crée son compte de la
+même façon, puis attend : son écran affiche « Compte en attente ». De votre
+côté, **Réglages → Comptes** le fait apparaître avec un bouton **Approuver**.
+Un clic, et il a accès.
 
-### 2.3 Créer les comptes
+Par défaut, un nouveau compte arrive en **consultation**. Pour en faire le
+second administrateur, cliquez sur **Modifier** en face de son nom et changez
+le rôle.
 
-Menu **Authentication → Users → Add user → Create new user**. Pour chaque
-personne : son adresse e-mail, un mot de passe, et cochez **Auto Confirm
-User**.
-
-Créez d'abord le vôtre, puis exécutez ceci dans le **SQL Editor** en
-remplaçant l'adresse — sans cette étape, personne n'est administrateur et
-plus rien ne peut être saisi :
-
-```sql
-insert into public.profils (id, nom, role)
-select id, 'Fridolin', 'admin' from auth.users where email = 'votre@adresse.com'
-on conflict (id) do update set role = 'admin', nom = excluded.nom;
-```
-
-Les comptes créés ensuite apparaissent automatiquement en **consultation**
-dans l'onglet Réglages de l'application, où vous pouvez passer le second
-administrateur en un clic.
-
-### 2.4 Relier l'application à la base
-
-Dans Supabase, **Project Settings → API**, relevez :
-
-- **Project URL** — `https://xxxxx.supabase.co`
-- **anon public** — la clé publique
-
-Reportez-les dans **`config.js`** :
-
-```js
-supabase: {
-  url: 'https://xxxxx.supabase.co',
-  anonKey: 'eyJhbGci...'
-}
-```
-
-Ces deux valeurs sont conçues pour être publiques : ce sont les règles du
-§ 2.2 qui protègent les données, pas leur secret. **N'inscrivez jamais ici la
-clé `service_role`** — celle-là contourne toutes les règles.
+Tant qu'un compte n'est pas approuvé, il ne voit **rien** : ni les montants,
+ni les noms, ni la liste des adhérents.
 
 ---
 
@@ -173,8 +142,9 @@ dessus force une synchronisation.
 | Situation | Que faire |
 |---|---|
 | La fenêtre noire se ferme aussitôt | Python n'est pas installé — Microsoft Store → Python 3 |
-| « Connexion refusée » | Vérifiez l'adresse e-mail ; le compte existe-t-il dans Supabase → Authentication → Users ? |
-| Connecté mais tout est en lecture seule | Le profil administrateur n'a pas été créé — voir § 2.3 |
+| « Connexion refusée » | Vérifiez l'adresse e-mail et le mot de passe. Jamais inscrit ? Cliquez sur « Première fois ici ». |
+| « Compte en attente » | Normal : un administrateur doit vous approuver (Réglages → Comptes) |
+| Connecté mais tout est en lecture seule | Votre compte est en consultation ; un administrateur peut changer votre rôle |
 | « n à envoyer » qui persiste | Pas de réseau, ou session expirée : déconnectez-vous et reconnectez-vous |
 | Le PC affiche « Base en ligne à jour » sans OneDrive | Réglages → Relier le dossier OneDrive |
 | Un adhérent veut modifier | C'est voulu : il lui faut un compte administrateur |
