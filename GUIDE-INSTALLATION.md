@@ -44,19 +44,26 @@ tableau de bord Supabase.**
 Le tout premier compte créé devient **administrateur** et a accès
 immédiatement. C'est donc à vous de le créer en premier.
 
-### Ajouter quelqu'un ensuite
+### Le code d'accès de l'association
 
-Donnez-lui simplement l'adresse de l'application. Il crée son compte de la
-même façon, puis attend : son écran affiche « Compte en attente ». De votre
-côté, **Réglages → Comptes** le fait apparaître avec un bouton **Approuver**.
-Un clic, et il a accès.
+C'est ce qui permet aux adhérents de s'inscrire **sans que vous ayez à
+intervenir**.
 
-Par défaut, un nouveau compte arrive en **consultation**. Pour en faire le
-second administrateur, cliquez sur **Modifier** en face de son nom et changez
-le rôle.
+Dans **Réglages → Code d'accès de l'association**, définissez un code — par
+exemple `GFN2026` — et communiquez-le aux adhérents sur WhatsApp. À
+l'inscription, celui qui le saisit entre immédiatement, en consultation.
 
-Tant qu'un compte n'est pas approuvé, il ne voit **rien** : ni les montants,
-ni les noms, ni la liste des adhérents.
+Le code est vérifié par le serveur, pas par la page : il n'est écrit nulle
+part dans l'application, et personne ne peut le lire depuis son navigateur.
+Vous pouvez le changer quand vous voulez — les comptes déjà créés ne sont pas
+affectés.
+
+Quelqu'un qui s'inscrit **sans** le code, ou avec un mauvais code, reste en
+attente et ne voit rien. Il apparaît alors dans **Réglages → Comptes** avec un
+bouton **Approuver** : les deux voies coexistent.
+
+Pour faire de quelqu'un le second administrateur : **Modifier** en face de son
+nom, puis changez le rôle.
 
 ---
 

@@ -154,3 +154,54 @@ create policy evenements_ajout on public.evenements for insert to authenticated
 drop policy if exists profils_ecriture on public.profils;
 create policy profils_ecriture on public.profils for all to authenticated
   using (public.est_admin()) with check (public.est_admin());
+
+-- ===========================================================================
+--  Code d'accès de l'association
+--
+--  L'adhérent s'inscrit seul et entre immédiatement s'il connaît le code.
+--  Le code est vérifié PAR LE SERVEUR : la table qui le contient n'a aucune
+--  politique RLS, donc aucun client ne peut la lire ni l'écrire. Seules les
+--  fonctions ci-dessous, en SECURITY DEFINER, y accèdent.
+-- ===========================================================================
+
+create table if not exists public.parametres (
+  cle    text primary key,
+  valeur text not null,
+  maj_le timestamptz not null default now()
+);
+alter table public.parametres enable row level security;
+
+create or replace function public.rejoindre(code text)
+returns boolean language plpgsql security definer set search_path = public as $$
+declare attendu text;
+begin
+  if auth.uid() is null then return false; end if;
+  select valeur into attendu from public.parametres where cle = 'code_adhesion';
+  if attendu is null or btrim(attendu) = '' then return false; end if;
+  if code is null or lower(btrim(code)) <> lower(btrim(attendu)) then return false; end if;
+  update public.profils set valide = true where id = auth.uid();
+  return true;
+end; $$;
+
+create or replace function public.lire_code_adhesion()
+returns text language plpgsql security definer set search_path = public as $$
+begin
+  if not public.est_admin() then raise exception 'reserve aux administrateurs'; end if;
+  return (select valeur from public.parametres where cle = 'code_adhesion');
+end; $$;
+
+create or replace function public.definir_code_adhesion(nouveau text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.est_admin() then raise exception 'reserve aux administrateurs'; end if;
+  insert into public.parametres (cle, valeur, maj_le)
+    values ('code_adhesion', btrim(nouveau), now())
+  on conflict (cle) do update set valeur = excluded.valeur, maj_le = now();
+end; $$;
+
+revoke all on function public.rejoindre(text) from public, anon;
+revoke all on function public.lire_code_adhesion() from public, anon;
+revoke all on function public.definir_code_adhesion(text) from public, anon;
+grant execute on function public.rejoindre(text) to authenticated;
+grant execute on function public.lire_code_adhesion() to authenticated;
+grant execute on function public.definir_code_adhesion(text) to authenticated;
