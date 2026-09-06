@@ -89,19 +89,46 @@ Le téléphone lit et écrit dans la base en ligne. Il ne touche pas directement
 
 ## 5. Les comptes
 
-- **Administrateur** (deux) — saisit les cotisations, les prêts, la
-  comptabilité, gère les comptes.
-- **Adhérent** — ouvre l'application en lecture seule.
+Deux niveaux, et la frontière passe par les Réglages :
 
-Ce que « lecture seule » veut dire ici, et c'est important : le refus vient de
-la base de données, pas de l'application. Un adhérent qui modifierait la page
-dans son navigateur pour faire réapparaître les boutons se verrait quand même
-opposer un refus par le serveur. C'est une vraie barrière, pas un simple
-masquage.
+- **Adhérent approuvé** — consulte ET saisit : cotisations, prêts,
+  comptabilité, fiches adhérents, rapports. Tout, sauf la gestion des comptes.
+- **Administrateur** — la même chose, plus : approuver les nouveaux comptes,
+  changer les rôles, modifier les informations de l'association, relier le
+  dossier OneDrive.
+
+Un adhérent ne peut donc ni s'octroyer des droits, ni approuver quelqu'un, ni
+suspendre un compte. Ce refus vient de la base de données, pas de l'écran : il
+tient même si quelqu'un manipule la page dans son navigateur.
+
+### Ce que cela implique
+
+Onze personnes pouvant saisir, c'est pratique, mais les erreurs deviennent
+possibles. Deux garde-fous existent :
+
+- **Rien n'est jamais effacé.** Chaque écriture est ajoutée au journal avec
+  son auteur et son horodatage. Une valeur corrigée n'écrase pas l'ancienne,
+  elle s'ajoute par-dessus — et l'historique reste consultable.
+- **Le retour en arrière est immédiat.** Si un adhérent saisit de travers,
+  **Réglages → Comptes → Modifier → Accès : Suspendu** lui retire tout droit
+  sur-le-champ. Vous pouvez aussi le remettre en consultation seule.
+
+Si les erreurs se multiplient, revenez à la règle d'origine : seuls les deux
+administrateurs saisissent, les autres consultent.
 
 ---
 
-## 6. Partager la situation par WhatsApp
+## 6. Le numéro Airtel Money
+
+Le numéro pour les cotisations — **077 99 79 57** — s'affiche en évidence sur
+le tableau de bord et sur le fichier de consultation envoyé par WhatsApp,
+pour que chacun l'ait sous les yeux au moment de payer.
+
+Pour le changer : **Réglages → Association → Modifier**.
+
+---
+
+## 7. Partager la situation par WhatsApp
 
 **Réglages → Créer le fichier de consultation.**
 
@@ -116,7 +143,7 @@ souvent et par eux-mêmes.
 
 ---
 
-## 7. Sans réseau
+## 8. Sans réseau
 
 Tout continue de fonctionner : les saisies s'accumulent sur l'appareil et
 partent dès que la connexion revient. La pastille en haut à droite indique
@@ -125,7 +152,7 @@ dessus force une synchronisation.
 
 ---
 
-## 8. Sauvegardes
+## 9. Sauvegardes
 
 - `donnees/snapshot.json` dans OneDrive : photo lisible de toutes les données,
   réécrite à chaque synchronisation du PC.
@@ -137,7 +164,7 @@ dessus force une synchronisation.
 
 ---
 
-## 9. Dépannage
+## 10. Dépannage
 
 | Situation | Que faire |
 |---|---|
@@ -147,11 +174,12 @@ dessus force une synchronisation.
 | Connecté mais tout est en lecture seule | Votre compte est en consultation ; un administrateur peut changer votre rôle |
 | « n à envoyer » qui persiste | Pas de réseau, ou session expirée : déconnectez-vous et reconnectez-vous |
 | Le PC affiche « Base en ligne à jour » sans OneDrive | Réglages → Relier le dossier OneDrive |
-| Un adhérent veut modifier | C'est voulu : il lui faut un compte administrateur |
+| Un adhérent ne peut pas saisir | Son compte n'est pas encore approuvé, ou il a été suspendu |
+| Un adhérent ne voit pas les Réglages complets | C'est voulu : la gestion des comptes est réservée aux administrateurs |
 
 ---
 
-## 10. Un écart hérité du classeur
+## 11. Un écart hérité du classeur
 
 La feuille *Statistiques* affichait un solde final de **400 000** alors que le
 total des cotisations est de **402 000** : les 2 000 FCFA de Geordi n'y
