@@ -72,7 +72,7 @@ function contexte() {
       ? Comptes.blocComptesServeur
       : (estAdmin ? Comptes.blocComptes : null),
     deconnexion() {
-      if (surServeur) synchro.deconnecter('supabase');
+      if (surServeur) { synchro.deconnecter('supabase'); localStorage.removeItem('tontine:supabase:vu'); }
       else Comptes.fermerSession();
       session = null;
       ecranAuth = null;
@@ -139,6 +139,16 @@ function rendre() {
       return;
     }
     session = synchro.supabase.profil;
+    // Compte supprimé par un administrateur pendant que l'application était
+    // ouverte : plus aucun profil ne correspond, on referme la session.
+    if (session?.manquant && localStorage.getItem('tontine:supabase:vu') === '1') {
+      localStorage.removeItem('tontine:supabase:vu');
+      synchro.deconnecter('supabase');
+      session = null; ecranAuth = null;
+      toast('Ce compte n’existe plus.');
+      return rendre();
+    }
+    if (session && !session.manquant) localStorage.setItem('tontine:supabase:vu', '1');
     // Compte créé mais pas encore approuvé : rien ne doit être visible.
     if (session && !session.valide) {
       onglets.hidden = true;
