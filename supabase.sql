@@ -205,3 +205,56 @@ revoke all on function public.definir_code_adhesion(text) from public, anon;
 grant execute on function public.rejoindre(text) to authenticated;
 grant execute on function public.lire_code_adhesion() to authenticated;
 grant execute on function public.definir_code_adhesion(text) to authenticated;
+
+-- ===========================================================================
+--  Approuver, bloquer, supprimer
+--
+--  L'administrateur décide qui entre et qui n'entre plus :
+--    • approuver     — profils.valide passe à vrai (simple PATCH, déjà permis) ;
+--    • bloquer       — valide faux + bloque vrai. Le blocage se distingue de
+--                      l'attente, et surtout le code d'accès ne le lève pas ;
+--    • supprimer     — le compte disparaît de auth.users. Les écritures déjà
+--                      faites restent dans le journal, sans auteur.
+--
+--  Deux garde-fous, posés dans la base et non dans l'écran : on ne supprime
+--  ni son propre compte, ni le dernier administrateur.
+-- ===========================================================================
+
+alter table public.profils add column if not exists bloque boolean not null default false;
+
+-- Supprimer un utilisateur ne doit pas emporter ses écritures.
+alter table public.evenements drop constraint if exists evenements_auteur_fkey;
+alter table public.evenements add constraint evenements_auteur_fkey
+  foreign key (auteur) references auth.users (id) on delete set null;
+
+create or replace function public.supprimer_compte(cible uuid)
+returns void language plpgsql security definer set search_path = public as $
+declare nb_admins int;
+begin
+  if not public.est_admin() then raise exception 'reserve aux administrateurs'; end if;
+  if cible = auth.uid() then raise exception 'vous ne pouvez pas supprimer votre propre compte'; end if;
+  select count(*) into nb_admins from public.profils where role = 'admin' and valide;
+  if nb_admins <= 1 and exists (select 1 from public.profils where id = cible and role = 'admin' and valide) then
+    raise exception 'il doit rester au moins un administrateur';
+  end if;
+  delete from auth.users where id = cible;
+end; $;
+
+revoke all on function public.supprimer_compte(uuid) from public, anon;
+grant execute on function public.supprimer_compte(uuid) to authenticated;
+
+-- Un compte bloqué ne se débloque pas tout seul avec le code d'accès.
+create or replace function public.rejoindre(code text)
+returns boolean language plpgsql security definer set search_path = public as $
+declare attendu text;
+begin
+  if auth.uid() is null then return false; end if;
+  if not exists (select 1 from public.profils where id = auth.uid()) then return false; end if;
+  if exists (select 1 from public.profils where id = auth.uid() and bloque) then return false; end if;
+  select valeur into attendu from public.parametres where cle = 'code_adhesion';
+  if attendu is null or btrim(attendu) = '' then return false; end if;
+  if code is null or lower(btrim(code)) <> lower(btrim(attendu)) then return false; end if;
+  update public.profils set valide = true where id = auth.uid();
+  return true;
+end; $;
+
