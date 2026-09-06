@@ -308,7 +308,7 @@ export function vueCotisations(ctx) {
         'Total ' + annee + ' : ' + fmtMontant(totauxMois.reduce((s, x) => s + x, 0), dev))),
     h('p', { class: 'doux', style: 'margin-top:-.4rem' }, ctx.peutEcrire
       ? 'Cliquez dans une case pour saisir un montant. Laissez vide pour un mois non cotisé.'
-      : 'Consultation seule : votre compte n’a pas le droit de modifier ces montants.'),
+      : 'Consultation seule : seuls les administrateurs modifient ces montants.'),
     adherents.length === 0
       ? h('div', { class: 'carte' }, h('p', { class: 'vide' }, 'Ajoutez d’abord des adhérents.'))
       : h('div', { class: 'carte' }, h('div', { class: 'defilable' },

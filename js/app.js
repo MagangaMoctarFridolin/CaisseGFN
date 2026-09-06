@@ -50,13 +50,14 @@ let ecranAuth = null;
 
 function contexte() {
   // Deux niveaux séparés :
-  //  • peutEcrire  → saisir les cotisations, prêts, comptabilité, adhérents.
-  //                  Accordé à TOUT compte approuvé, adhérents compris.
-  //  • estAdmin    → gérer les comptes, l'association, le dossier OneDrive.
-  //                  Réservé aux administrateurs.
+  //  • estAdmin    → tout : saisir, gérer les comptes, l'association, OneDrive.
+  //  • un adhérent → consulte, imprime, exporte. Il n'écrit rien.
+  //
+  // La saisie et l'administration sont volontairement réunies : dans une
+  // tontine, savoir qui a inscrit un montant compte autant que le montant.
   const approuve = surServeur ? !!session?.valide : !!session;
-  const peutEcrire = surServeur ? approuve : session?.role === 'admin';
   const estAdmin = session?.role === 'admin' && approuve;
+  const peutEcrire = estAdmin;
   return {
     etat: synchro.etat,
     synchro,
@@ -78,7 +79,7 @@ function contexte() {
       rendre();
     },
     async enregistrer(entite, type, donnees) {
-      if (!peutEcrire) return toast('Votre compte n’a pas le droit de modifier les données.');
+      if (!peutEcrire) return toast('Consultation seule : seuls les administrateurs saisissent.');
       try { await synchro.enregistrer(entite, type, donnees); }
       catch (e) { toast('Erreur : ' + e.message); }
     },
