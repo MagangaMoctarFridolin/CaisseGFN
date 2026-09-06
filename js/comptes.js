@@ -236,26 +236,40 @@ export function ecranConnexionServeur(synchro, surConnexion) {
   const dessiner = () => {
     const inscription = mode === 'inscription';
     const message = h('div');
-    const nom = h('input', { type: 'text', autocomplete: 'name' });
-    const email = h('input', { type: 'email', autocapitalize: 'none', autocomplete: 'username' });
-    const motDePasse = h('input', { type: 'password',
+    const nom = h('input', { type: 'text', autocomplete: 'name', required: inscription });
+    const email = h('input', { type: 'email', autocapitalize: 'none',
+      autocomplete: 'username', required: true, inputmode: 'email' });
+    const motDePasse = h('input', { type: 'password', required: true,
       autocomplete: inscription ? 'new-password' : 'current-password' });
     const bouton = h('button', { class: 'primaire', type: 'submit',
       style: 'width:100%;justify-content:center' },
       inscription ? 'Créer mon compte' : 'Se connecter');
 
     const envoyer = async () => {
+      // Garde-fou : ne JAMAIS partir avec un champ vide. Une requête sans
+      // adresse est refusée par le serveur avec un message incompréhensible.
+      const adresse = email.value.trim();
+      if (!adresse || !adresse.includes('@')) {
+        return message.replaceChildren(h('div', { class: 'mauvais' },
+          'Saisissez une adresse e-mail valide.'));
+      }
+      if (!motDePasse.value) {
+        return message.replaceChildren(h('div', { class: 'mauvais' }, 'Saisissez votre mot de passe.'));
+      }
       if (inscription && motDePasse.value.length < 6) {
         return message.replaceChildren(h('div', { class: 'mauvais' },
           'Mot de passe trop court : six caractères au minimum.'));
+      }
+      if (inscription && !nom.value.trim()) {
+        return message.replaceChildren(h('div', { class: 'mauvais' }, 'Indiquez votre nom.'));
       }
       bouton.disabled = true;
       bouton.textContent = inscription ? 'Création…' : 'Connexion…';
       message.replaceChildren();
       try {
         const profil = inscription
-          ? await synchro.inscrireSupabase(email.value, motDePasse.value, nom.value)
-          : await synchro.connecterSupabase(email.value, motDePasse.value);
+          ? await synchro.inscrireSupabase(adresse, motDePasse.value, nom.value)
+          : await synchro.connecterSupabase(adresse, motDePasse.value);
         surConnexion(profil);
       } catch (e) {
         message.replaceChildren(h('div', { class: 'mauvais' }, e.message));

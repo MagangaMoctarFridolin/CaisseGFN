@@ -354,11 +354,21 @@ export class StockageSupabase {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) {
       const m = j.error_description || j.msg || j.message || '';
+      if (j.error_code === 'anonymous_provider_disabled' || /anonymous/i.test(m)) {
+        // Le serveur n'a reçu aucune adresse : le formulaire est parti vide.
+        throw new Error("L'adresse e-mail n'est pas arrivée jusqu'au serveur. Rechargez la page et ressaisissez les trois champs.");
+      }
       if (/already registered|already exists/i.test(m)) {
         throw new Error('Cette adresse a déjà un compte. Utilisez « Se connecter ».');
       }
       if (/password/i.test(m) && /least|court|short/i.test(m)) {
         throw new Error('Mot de passe trop court : six caractères au minimum.');
+      }
+      if (/email/i.test(m) && /invalid/i.test(m)) {
+        throw new Error('Adresse e-mail refusée par le serveur : vérifiez la saisie.');
+      }
+      if (/signups? not allowed|disabled/i.test(m)) {
+        throw new Error("Les inscriptions sont fermées sur le serveur. Prévenez l'administrateur.");
       }
       throw new Error(m || "Inscription impossible pour l'instant.");
     }

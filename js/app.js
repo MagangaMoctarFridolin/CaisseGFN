@@ -41,6 +41,10 @@ let annee = +localStorage.getItem('tontine:annee') || 0;
 let anneeChoisie = !!annee;
 let session = null;
 let feuilleStyle = '';
+// L'écran de connexion doit SURVIVRE aux réaffichages : sans cela, un
+// événement de synchronisation survenant pendant la saisie reconstruit le
+// formulaire, efface ce qui a été tapé et renvoie au mode « connexion ».
+let ecranAuth = null;
 
 /* ------------------------------------------------------------------ contexte */
 
@@ -62,6 +66,7 @@ function contexte() {
       if (surServeur) synchro.deconnecter('supabase');
       else Comptes.fermerSession();
       session = null;
+      ecranAuth = null;
       rendre();
     },
     async enregistrer(entite, type, donnees) {
@@ -114,10 +119,14 @@ function rendre() {
   if (surServeur) {
     if (!synchro.supabase.estConnecte()) {
       onglets.hidden = true;
-      app.replaceChildren(Comptes.ecranConnexionServeur(synchro, (profil) => {
-        session = profil;
-        rendre();
-      }));
+      if (!ecranAuth) {
+        ecranAuth = Comptes.ecranConnexionServeur(synchro, (profil) => {
+          session = profil;
+          ecranAuth = null;
+          rendre();
+        });
+      }
+      if (app.firstChild !== ecranAuth) app.replaceChildren(ecranAuth);
       return;
     }
     session = synchro.supabase.profil;
@@ -125,7 +134,7 @@ function rendre() {
     if (session && !session.valide) {
       onglets.hidden = true;
       app.replaceChildren(Comptes.ecranEnAttente(session, () => {
-        synchro.deconnecter('supabase'); session = null; rendre();
+        synchro.deconnecter('supabase'); session = null; ecranAuth = null; rendre();
       }));
       return;
     }
