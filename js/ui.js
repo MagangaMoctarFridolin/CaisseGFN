@@ -130,13 +130,9 @@ export function vueTableauBord(ctx) {
         ? stat('Remboursements en retard', retards.length, true)
         : stat('Adhérents actifs', t.nbAdherents)),
 
-    etat.association.airtelMoney ? h('div', { class: 'carte',
-      style: 'background:var(--accent-clair);border-color:transparent' },
-      h('div', { style: 'display:flex;flex-wrap:wrap;align-items:baseline;gap:.2rem 1rem' },
-        h('span', { style: 'font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--accent)' },
-          'Cotisations par Airtel Money'),
-        h('span', { style: 'font-size:1.5rem;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums' },
-          etat.association.airtelMoney))) : null,
+    bandeauMoyens(etat),
+
+    ctx.blocDeclarations ? ctx.blocDeclarations(ctx) : null,
 
     h('div', { class: 'carte' },
       h('h2', {}, 'Cotisations par mois — ' + annee),
@@ -164,6 +160,26 @@ export function vueTableauBord(ctx) {
     h('div', { class: 'carte' },
       h('h2', {}, 'Classement des apports'),
       tableauApports(ctx)));
+}
+
+/**
+ * Le rappel « voici par où cotiser », en évidence sur le tableau de bord.
+ * Chaque moyen actif y figure avec son numéro, pour qu'un adhérent l'ait sous
+ * les yeux au moment de payer.
+ */
+export function bandeauMoyens(etat) {
+  const liste = DB.canaux(etat);
+  if (!liste.length) return null;
+  return h('div', { class: 'carte moyens',
+    style: 'background:var(--accent-clair);border-color:transparent' },
+    h('div', { style: 'font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);margin-bottom:.5rem' },
+      liste.length > 1 ? 'Où verser sa cotisation' : 'Cotisations par ' + liste[0].nom),
+    h('div', { style: 'display:flex;flex-wrap:wrap;gap:.4rem 2rem' },
+      liste.map((c) => h('div', {},
+        liste.length > 1
+          ? h('div', { style: 'font-size:.8rem;color:var(--accent);opacity:.85' }, c.nom) : null,
+        h('div', { style: 'font-size:1.35rem;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums' },
+          coordonneesCanal(c) || c.nom)))));
 }
 
 function stat(libelle, valeur, alerte) {
@@ -271,13 +287,58 @@ function prochainNumero(etat) {
 
 /* ============================================================== cotisations === */
 
+/**
+ * La pastille de couleur posée dans le coin d'une case : elle dit d'un coup
+ * d'œil par où l'argent est passé, sans voler la place du montant. Le nom
+ * complet est dans l'infobulle, et un clic ouvre le détail.
+ */
+function pastilleMoyen(etat, c, surClic) {
+  const nom = DB.nomCanal(etat, c.moyen);
+  const couleur = couleurCanal(etat, c.moyen);
+  const titre = nom + (c.reference ? ' · ' + c.reference : '')
+    + (surClic ? ' — cliquer pour détailler' : '');
+  const attrs = { class: 'repere' + (couleur ? '' : ' vague'), title: titre, 'aria-label': titre,
+    style: couleur ? `background:${couleur}` : null };
+  return surClic
+    ? h('button', { ...attrs, type: 'button', onClick: surClic })
+    : h('span', attrs);
+}
+
+function legendeMoyens(etat) {
+  const liste = DB.canaux(etat, true);
+  if (!liste.length) return null;
+  return h('p', { class: 'doux legende-moyens' },
+    liste.map((c) => h('span', {},
+      h('span', { class: 'repere', style: `background:${couleurCanal(etat, c.id)}` }), c.nom)),
+    h('span', {}, h('span', { class: 'repere vague' }), 'moyen non précisé'));
+}
+
+const CLE_MOYEN = 'tontine:moyen';
+
 export function vueCotisations(ctx) {
   const { etat, annee } = ctx;
   const dev = etat.association.devise;
   const adherents = [...etat.adherents].sort((a, b) => (a.numero || '').localeCompare(b.numero || ''));
+  const moyens = DB.canaux(etat);
+
+  // Le moyen « du moment » : celui qu'on applique à tout ce qu'on tape, sans
+  // avoir à le redire douze fois. Il reste d'une séance à l'autre.
+  let moyenCourant = localStorage.getItem(CLE_MOYEN) || moyens[0]?.id || '';
+  if (moyenCourant && !moyens.some((m) => m.id === moyenCourant)) moyenCourant = moyens[0]?.id || '';
 
   const trouver = (adherentId, mois) =>
     etat.cotisations.find((c) => c.adherentId === adherentId && c.annee === annee && c.mois === mois);
+
+  const ecrire = (a, mois, existante, champs) => {
+    ctx.enregistrer('cotisation', 'upsert', {
+      id: existante?.id || DB.uid('cot'),
+      adherentId: a.id, annee, mois,
+      date: existante?.date || new Date().toISOString().slice(0, 10),
+      moyen: existante?.moyen || moyenCourant,
+      reference: existante?.reference || '',
+      ...champs
+    });
+  };
 
   const saisir = (a, mois, champ) => {
     const brut = champ.value.replace(/[^\d.-]/g, '');
@@ -287,13 +348,36 @@ export function vueCotisations(ctx) {
     if (montant === 0 && existante) {
       ctx.enregistrer('cotisation', 'delete', { id: existante.id });
     } else if (montant > 0) {
-      ctx.enregistrer('cotisation', 'upsert', {
-        id: existante?.id || DB.uid('cot'),
-        adherentId: a.id, annee, mois, montant,
-        date: existante?.date || new Date().toISOString().slice(0, 10)
-      });
+      ecrire(a, mois, existante, { montant });
     }
   };
+
+  // La fiche détaillée d'un versement : ce qui sert quand le mois sort de
+  // l'ordinaire — un paiement en espèces alors que tout le reste passe par
+  // Airtel, ou une référence de transaction à conserver.
+  const detailler = (a, mois) => {
+    const c = trouver(a.id, mois);
+    formulaire(`${nomComplet(a)} — ${MOIS_NOMS[mois - 1]} ${annee}`, [
+      { cle: 'montant', libelle: 'Montant (' + dev + ')', type: 'number',
+        valeur: c ? Math.round(c.montant) : null },
+      { cle: 'moyen', libelle: 'Moyen de versement', type: 'select',
+        valeur: c?.moyen ?? moyenCourant,
+        options: [{ valeur: '', libelle: '— non précisé —' },
+          ...DB.canaux(etat, true).map((m) => ({ valeur: m.id, libelle: m.nom }))] },
+      { cle: 'reference', libelle: 'Référence de la transaction', valeur: c?.reference || '' },
+      { cle: 'date', libelle: 'Date du versement', type: 'date',
+        valeur: c?.date || new Date().toISOString().slice(0, 10) }
+    ], (v) => {
+      const montant = Math.round(+v.montant || 0);
+      if (montant <= 0) {
+        if (c) { ctx.enregistrer('cotisation', 'delete', { id: c.id }); toast('Versement effacé.'); }
+        return;
+      }
+      ecrire(a, mois, c, { montant, moyen: v.moyen, reference: v.reference, date: v.date });
+    });
+  };
+
+  const repere = (c) => (c ? pastilleMoyen(etat, c, null) : null);
 
   const totauxMois = Array.from({ length: 12 }, (_, i) =>
     adherents.reduce((s, a) => s + (+trouver(a.id, i + 1)?.montant || 0), 0));
@@ -303,7 +387,8 @@ export function vueCotisations(ctx) {
       const mois = i + 1;
       const c = trouver(a.id, mois);
       if (!ctx.peutEcrire) {
-        return h('td', { class: 'num', style: 'padding:.5rem .55rem' }, c ? fmtNombre(c.montant) : '—');
+        return h('td', { class: 'num', style: 'padding:.5rem .55rem' },
+          c ? fmtNombre(c.montant) : '—', moyens.length ? repere(c) : null);
       }
       const champ = h('input', {
         type: 'text', inputmode: 'numeric', value: c ? fmtNombre(c.montant) : '',
@@ -312,20 +397,32 @@ export function vueCotisations(ctx) {
         onBlur: (e) => saisir(a, mois, e.target),
         onKeydown: (e) => { if (e.key === 'Enter') e.target.blur(); }
       });
-      return h('td', {}, champ);
+      // Pas de pastille sur une case vide : la grille resterait illisible avec
+      // cent quarante points. On tape d'abord le montant, la pastille vient
+      // avec, et c'est elle qui ouvre le détail.
+      const bouton = c ? pastilleMoyen(etat, c, () => detailler(a, mois)) : null;
+      return h('td', { class: 'cellule' + (c ? ' avec-repere' : '') }, champ, bouton);
     });
     const total = DB.totalCotisationsAdherent(etat, a.id, annee);
     return h('tr', {}, h('td', { class: 'nom' }, nomComplet(a)), cellules,
       h('td', { class: 'num', style: 'font-weight:650' }, total ? fmtNombre(total) : '—'));
   });
 
+  const choixMoyen = (ctx.peutEcrire && moyens.length) ? h('label', { class: 'choix-moyen' },
+    h('span', { class: 'doux' }, 'Moyen : '),
+    h('select', { onChange: (e) => { moyenCourant = e.target.value;
+        localStorage.setItem(CLE_MOYEN, moyenCourant); ctx.rafraichir(); } },
+      moyens.map((m) => h('option', { value: m.id, selected: m.id === moyenCourant }, m.nom)))) : null;
+
   return h('div', {},
     h('div', { class: 'barre' },
-      h('h1', {}, 'Cotisations'), selecteurAnnee(ctx),
+      h('h1', {}, 'Cotisations'), selecteurAnnee(ctx), choixMoyen,
       h('span', { class: 'doux pousse' },
         'Total ' + annee + ' : ' + fmtMontant(totauxMois.reduce((s, x) => s + x, 0), dev))),
     h('p', { class: 'doux', style: 'margin-top:-.4rem' }, ctx.peutEcrire
-      ? 'Cliquez dans une case pour saisir un montant. Laissez vide pour un mois non cotisé.'
+      ? (moyens.length
+          ? 'Tapez le montant : il est enregistré avec le moyen choisi ci-dessus. Le petit repère qui apparaît alors dans la case ouvre le détail — moyen, référence, date — pour les exceptions.'
+          : 'Cliquez dans une case pour saisir un montant. Laissez vide pour un mois non cotisé.')
       : 'Consultation seule : seuls les administrateurs modifient ces montants.'),
     adherents.length === 0
       ? h('div', { class: 'carte' }, h('p', { class: 'vide' }, 'Ajoutez d’abord des adhérents.'))
@@ -339,7 +436,8 @@ export function vueCotisations(ctx) {
             h('tfoot', {}, h('tr', { class: 'total' },
               h('td', { class: 'nom' }, 'Total'),
               totauxMois.map((t) => h('td', { class: 'num' }, t ? fmtNombre(t) : '—')),
-              h('td', { class: 'num' }, fmtNombre(totauxMois.reduce((s, x) => s + x, 0)))))))));
+              h('td', { class: 'num' }, fmtNombre(totauxMois.reduce((s, x) => s + x, 0))))))),
+          legendeMoyens(etat)));
 }
 
 /* ==================================================================== prêts === */
@@ -475,6 +573,31 @@ export function vueComptabilite(ctx) {
 
 /* ================================================================ rapports === */
 
+/**
+ * Par où l'argent est entré cette année. Utile au moment de rapprocher la
+ * caisse : tant par Airtel Money, tant en espèces.
+ */
+function tableauMoyens(etat, annee, dev) {
+  const lignes = DB.parMoyen(etat, annee).filter((l) => l.montant);
+  if (lignes.length < 2 && !lignes.some((l) => l.id)) return null;
+  const total = lignes.reduce((s, l) => s + l.montant, 0) || 1;
+  return h('div', {},
+    h('h3', { style: 'margin-top:1rem' }, 'Répartition par moyen de versement'),
+    h('table', {},
+      h('thead', {}, h('tr', {},
+        h('th', {}, 'Moyen'), h('th', { class: 'num' }, 'Versements'),
+        h('th', { class: 'num' }, 'Montant'), h('th', { class: 'num' }, 'Part'))),
+      h('tbody', {}, lignes.map((l) => h('tr', {},
+        h('td', {}, l.nom),
+        h('td', { class: 'num' }, l.nombre),
+        h('td', { class: 'num' }, fmtNombre(l.montant)),
+        h('td', { class: 'num' }, ((l.montant / total) * 100).toFixed(1) + ' %'))),
+        h('tr', { class: 'total' }, h('td', {}, 'Total'),
+          h('td', { class: 'num' }, lignes.reduce((s, l) => s + l.nombre, 0)),
+          h('td', { class: 'num' }, fmtMontant(total, dev)),
+          h('td', { class: 'num' }, '100 %')))));
+}
+
 export function vueRapports(ctx) {
   const { etat, annee } = ctx;
   const dev = etat.association.devise;
@@ -535,6 +658,7 @@ export function vueRapports(ctx) {
           h('td', {}, m), h('td', { class: 'num' }, mois[i] ? fmtNombre(mois[i]) : '—'))),
           h('tr', { class: 'total' }, h('td', {}, 'Total'),
             h('td', { class: 'num' }, fmtMontant(mois.reduce((s, x) => s + x, 0), dev))))),
+      tableauMoyens(etat, annee, dev),
       h('h3', { style: 'margin-top:1rem' }, 'Détail par adhérent'),
       tableauApports(ctx)));
     zone.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -576,6 +700,24 @@ function exporterCSV(etat, annee) {
   }
   const totaux = Array.from({ length: 12 }, (_, i) => DB.parMois(etat, annee)[i]);
   lignes.push(['', 'TOTAL', '', ...totaux.map((t) => t || ''), totaux.reduce((s, x) => s + x, 0)].join(sep));
+
+  // Le détail versement par versement, avec le moyen et la référence : c'est
+  // ce qui permet de rapprocher le relevé Airtel du cahier de caisse.
+  const parMoyen = DB.parMoyen(etat, annee).filter((l) => l.montant);
+  if (parMoyen.length) {
+    lignes.push('', 'RÉPARTITION PAR MOYEN DE VERSEMENT');
+    lignes.push(['Moyen', 'Versements', 'Montant'].join(sep));
+    for (const l of parMoyen) lignes.push([l.nom, l.nombre, l.montant].join(sep));
+    lignes.push('', 'DÉTAIL DES VERSEMENTS');
+    lignes.push(['Date', 'Adhérent', 'Mois', 'Montant', 'Moyen', 'Référence'].join(sep));
+    const detail = etat.cotisations.filter((c) => c.annee === annee)
+      .sort((x, y) => (x.date || '').localeCompare(y.date || '') || x.mois - y.mois);
+    for (const c of detail) {
+      const a = etat.adherents.find((x) => x.id === c.adherentId);
+      lignes.push([c.date || '', nomComplet(a), MOIS_NOMS[(c.mois || 1) - 1],
+        c.montant, DB.nomCanal(etat, c.moyen), (c.reference || '').replace(/[;\r\n]/g, ' ')].join(sep));
+    }
+  }
   telecharger(`cotisations-${annee}.csv`, '﻿' + lignes.join('\r\n'), 'text/csv;charset=utf-8');
 }
 
@@ -621,6 +763,77 @@ function blocCodeAdhesion(ctx) {
       'Changez-le si quelqu’un le diffuse trop largement : les comptes déjà créés ne sont pas affectés.'));
 }
 
+/* ------------------------------------------------- moyens de versement --- */
+
+const TYPES_CANAL = [
+  { valeur: 'mobile', libelle: 'Mobile money (Airtel, Moov…)' },
+  { valeur: 'especes', libelle: 'Espèces remises en main propre' },
+  { valeur: 'banque', libelle: 'Virement ou dépôt bancaire' },
+  { valeur: 'autre', libelle: 'Autre' }
+];
+
+/** Ce qu'il faut afficher à l'adhérent pour qu'il puisse payer. */
+export function coordonneesCanal(c) {
+  if (c.type === 'especes') return c.detail || 'À remettre au trésorier';
+  return c.numero || c.detail || '';
+}
+
+/** Une teinte stable par moyen, pour la pastille dans la grille. */
+export function couleurCanal(etat, id) {
+  const i = DB.canaux(etat, true).findIndex((c) => c.id === id);
+  if (i < 0) return null;
+  return `hsl(${(i * 67 + 152) % 360} 58% 45%)`;
+}
+
+function blocMoyens(ctx) {
+  const { etat } = ctx;
+  const admin = ctx.estAdmin;
+  const liste = DB.canaux(etat, true);
+
+  const enregistrer = (nouvelle) =>
+    ctx.enregistrer('association', 'upsert', { ...etat.association, canaux: nouvelle });
+
+  const editer = (c) => formulaire(c ? 'Modifier « ' + c.nom + ' »' : 'Nouveau moyen de versement', [
+    { cle: 'nom', libelle: 'Nom affiché', valeur: c?.nom || '', requis: true },
+    { cle: 'type', libelle: 'Nature', type: 'select', valeur: c?.type || 'mobile', options: TYPES_CANAL },
+    { cle: 'numero', libelle: 'Numéro ou compte (vide pour les espèces)', valeur: c?.numero || '' },
+    { cle: 'detail', libelle: 'Précision affichée aux adhérents', valeur: c?.detail || '', large: true },
+    { cle: 'actif', libelle: 'Proposé aux adhérents', type: 'select', valeur: (c?.actif === false ? 'non' : 'oui'),
+      options: [{ valeur: 'oui', libelle: 'Oui' }, { valeur: 'non', libelle: 'Non — ancien moyen' }] }
+  ], (v) => {
+    const fiche = { id: c?.id || DB.uid('cnl'), nom: v.nom, type: v.type,
+      numero: v.numero, detail: v.detail, actif: v.actif === 'oui' };
+    enregistrer(c ? liste.map((x) => (x.id === c.id ? fiche : x)) : [...liste, fiche]);
+    toast(c ? 'Moyen modifié.' : 'Moyen ajouté.');
+  });
+
+  const supprimer = (c) => confirmer(`Retirer « ${c.nom} » de la liste ?`,
+    'Les cotisations déjà enregistrées avec ce moyen gardent leur trace : elles resteront lisibles dans la répartition.',
+    () => { enregistrer(liste.filter((x) => x.id !== c.id)); toast('Moyen retiré.'); });
+
+  const corps = liste.length
+    ? h('tbody', {}, liste.map((c) => h('tr', {},
+        h('td', {}, c.nom, c.actif === false
+          ? h('span', { class: 'etiquette attente', style: 'margin-left:.4rem' }, 'inactif') : null),
+        h('td', { class: 'doux' }, coordonneesCanal(c) || '—'),
+        admin ? h('td', { style: 'text-align:right;white-space:nowrap' },
+          h('button', { onClick: () => editer(c) }, 'Modifier'), ' ',
+          h('button', { class: 'danger', onClick: () => supprimer(c) }, 'Retirer')) : null)))
+    : h('tbody', {}, h('tr', {}, h('td', { colspan: 3, class: 'doux' },
+        'Aucun moyen enregistré : les cotisations seront saisies sans précision de canal.')));
+
+  return h('div', { class: 'carte' },
+    h('h2', {}, 'Moyens de versement'),
+    h('p', { class: 'doux' },
+      'Ce sont les canaux par lesquels les adhérents cotisent. Ils s’affichent sur le tableau de bord et sur le fichier envoyé par WhatsApp, et servent à indiquer, cotisation par cotisation, par où l’argent est passé.'),
+    h('div', { class: 'defilable' }, h('table', {},
+      h('thead', {}, h('tr', {},
+        h('th', {}, 'Moyen'), h('th', {}, 'Numéro ou précision'), admin ? h('th', {}, '') : null)),
+      corps)),
+    admin ? h('div', { class: 'barre', style: 'margin-top:.8rem' },
+      h('button', { class: 'primaire', onClick: () => editer(null) }, 'Ajouter un moyen')) : null);
+}
+
 /* ================================================================ réglages === */
 
 export function vueReglages(ctx) {
@@ -633,9 +846,8 @@ export function vueReglages(ctx) {
     { cle: 'adresse', libelle: 'Adresse du siège', valeur: assoc.adresse },
     { cle: 'telephone', libelle: 'Téléphone', valeur: assoc.telephone },
     { cle: 'email', libelle: 'E-mail', valeur: assoc.email },
-    { cle: 'airtelMoney', libelle: 'Numéro Airtel Money (cotisations)', valeur: assoc.airtelMoney },
     { cle: 'devise', libelle: 'Devise', valeur: assoc.devise }
-  ], (v) => ctx.enregistrer('association', 'upsert', v));
+  ], (v) => ctx.enregistrer('association', 'upsert', { ...assoc, ...v }));
 
   const bloc = (titre, ...contenu) => h('div', { class: 'carte' }, h('h2', {}, titre), ...contenu);
 
@@ -675,6 +887,8 @@ export function vueReglages(ctx) {
 
     ctx.blocComptes ? ctx.blocComptes(ctx) : null,
 
+    blocMoyens(ctx),
+
     bloc('Partager avec les adhérents',
       h('p', { class: 'doux' },
         'Le fichier de consultation est une page unique contenant la situation du moment. Il s’ouvre sur n’importe quel téléphone, sans installation ni compte Microsoft, et ne peut pas être modifié — c’est ce qu’il faut envoyer sur WhatsApp.'),
@@ -712,7 +926,7 @@ export function vueReglages(ctx) {
       h('table', {}, h('tbody', {},
         [['Nom', assoc.nom], ['Siège', assoc.adresse], ['Téléphone', assoc.telephone || '—'],
          ['E-mail', assoc.email || '—'],
-         ['Airtel Money', assoc.airtelMoney || '—'], ['Devise', assoc.devise]].map(([k, v]) =>
+         ['Devise', assoc.devise]].map(([k, v]) =>
           h('tr', {}, h('td', { class: 'doux' }, k), h('td', {}, v))))),
       admin ? h('div', { class: 'barre', style: 'margin-top:.8rem' },
         h('button', { onClick: modifierAssoc }, 'Modifier')) : null),
