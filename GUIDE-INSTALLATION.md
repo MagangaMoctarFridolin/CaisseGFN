@@ -132,17 +132,89 @@ le rôle.
 
 ---
 
-## 6. Le numéro Airtel Money
+## 6. Les moyens de versement
 
-Le numéro pour les cotisations — **077 99 79 57** — s'affiche en évidence sur
-le tableau de bord et sur le fichier de consultation envoyé par WhatsApp,
-pour que chacun l'ait sous les yeux au moment de payer.
+Deux canaux sont en place au départ :
 
-Pour le changer : **Réglages → Association → Modifier**.
+| Moyen | Ce qui s'affiche aux adhérents |
+|---|---|
+| **Airtel Money** | 077 99 79 57 |
+| **Espèces** | Remises au trésorier |
+
+Ils apparaissent en évidence sur le tableau de bord et sur le fichier envoyé
+par WhatsApp, pour que chacun les ait sous les yeux au moment de payer.
+
+Pour en ajouter un (Moov Money, un virement bancaire…), en changer le numéro
+ou en retirer un devenu inutile : **Réglages → Moyens de versement**. Un moyen
+mis en « ancien moyen » disparaît de la liste proposée à la saisie, mais les
+cotisations déjà enregistrées avec lui gardent leur trace.
+
+### Noter par où chaque cotisation est arrivée
+
+Dans l'onglet **Cotisations**, un sélecteur **« Moyen : … »** est posé en haut
+de la grille. Tout ce que vous tapez ensuite est enregistré avec ce moyen-là —
+vous n'avez donc rien à redire tant que vous saisissez une série de versements
+Airtel.
+
+Dès qu'un montant est inscrit, une **petite pastille de couleur** apparaît dans
+le coin de la case : verte pour Airtel Money, bleue pour les espèces, un cercle
+vide quand le moyen n'est pas connu (c'est le cas des données reprises du
+classeur de 2023). La légende sous le tableau rappelle les couleurs.
+
+Un clic sur cette pastille ouvre le **détail du versement** — montant, moyen,
+référence de la transaction, date. C'est là qu'on note qu'untel a payé en
+espèces ce mois-ci alors qu'il passe d'habitude par Airtel, ou qu'on conserve
+le numéro de transaction Airtel pour pouvoir le retrouver plus tard. Un montant
+mis à zéro efface le versement.
+
+### Vérifier la caisse
+
+Le **rapport annuel** (Rapports → Rapport annuel) comporte une section
+*Répartition par moyen de versement* : tant d'entrées et tant de francs par
+canal, avec la part de chacun. L'**export CSV** va plus loin — il ajoute, après
+le tableau habituel, la liste de tous les versements de l'année avec leur date,
+leur moyen et leur référence. C'est ce qu'il faut pour rapprocher le relevé
+Airtel du cahier de caisse. Le fichier de consultation WhatsApp reprend lui
+aussi la répartition.
 
 ---
 
-## 7. Partager la situation par WhatsApp
+## 7. « J'ai versé » — les déclarations des adhérents
+
+L'application **n'encaisse pas d'argent**. Elle ne demande pas un montant et un
+numéro pour envoyer un code de validation sur le téléphone : ce serait un
+prélèvement Airtel Money, qui suppose un compte marchand et un contrat. Ici,
+l'adhérent paie comme avant — Airtel Money, ou de la main à la main — puis il
+**déclare** ce qu'il a versé.
+
+**Côté adhérent**, sur son téléphone, en haut du tableau de bord : un bouton
+**Déclarer un versement**. Il indique le montant, le mois, le moyen, son numéro
+de téléphone et la référence de la transaction Airtel. C'est envoyé, et il voit
+sa déclaration passer « en attente ». Tant qu'elle n'est pas traitée, il peut la
+retirer s'il s'est trompé.
+
+**Côté trésorier**, la déclaration apparaît en haut de votre tableau de bord,
+avec le nombre de déclarations « à traiter » :
+
+- **Valider** — vous vérifiez sur votre relevé Airtel que l'argent est bien
+  arrivé, vous reliez la déclaration à la fiche de l'adhérent, et vous validez.
+  C'est **cette validation** qui écrit la cotisation. Si un montant existe déjà
+  pour ce mois, l'application vous propose le total des deux.
+- **Refuser** — avec un motif, que l'adhérent verra sur son téléphone.
+
+Le point qui compte : **une déclaration n'est pas une écriture**. Rien n'entre
+dans les comptes tant que vous n'avez pas validé, et un adhérent qui tenterait
+de valider sa propre déclaration en manipulant la page se verrait refuser par la
+base de données. Ce que dit l'adhérent et ce que dit la caisse restent deux
+choses séparées.
+
+Ce que cela vous fait gagner : plus de « j'ai envoyé 15 000 mardi, tu as vu ? »
+sur WhatsApp. La référence de la transaction arrive avec le montant, vous
+rapprochez du relevé, vous validez.
+
+---
+
+## 8. Partager la situation par WhatsApp
 
 **Réglages → Créer le fichier de consultation.**
 
@@ -157,16 +229,36 @@ souvent et par eux-mêmes.
 
 ---
 
-## 8. Sans réseau
+## 9. Réseau faible ou absent
 
-Tout continue de fonctionner : les saisies s'accumulent sur l'appareil et
-partent dès que la connexion revient. La pastille en haut à droite indique
-l'état — *à jour partout*, *n à envoyer*, *sur cet appareil* — et un clic
-dessus force une synchronisation.
+Tout continue de fonctionner. Les saisies s'accumulent sur l'appareil et
+partent dès que la connexion revient. La pastille en haut à droite dit où
+l'on en est :
+
+| Pastille | Ce que cela veut dire |
+|---|---|
+| **À jour partout** | Tout est parti, rien n'attend. |
+| **Hors ligne** | L'appareil n'a plus de réseau. Rien n'est perdu. |
+| **n à envoyer** | Le réseau est là mais le serveur n'a pas encore tout reçu. |
+| **Synchro à refaire** | Un envoi a échoué ; un clic sur la pastille réessaie. |
+
+Un clic sur la pastille force une synchronisation.
+
+Trois précautions sont prises pour les connexions capricieuses. Une requête
+qui reste sans réponse est **abandonnée au bout de vingt secondes** au lieu de
+laisser l'application figée sur « Synchronisation… ». Une coupure brève
+déclenche une **seconde tentative automatique**, mais un refus du serveur n'est
+jamais rejoué — il n'y a rien à en attendre. Et surtout, **une coupure de
+réseau ne vous déconnecte pas** : seule une vraie expiration de session vous
+renvoie à l'écran de connexion.
+
+Rien n'est jamais perdu pendant une coupure : la saisie est d'abord écrite sur
+l'appareil, et ce n'est qu'ensuite qu'elle part. Si le téléphone s'éteint avant
+le retour du réseau, elle est toujours là à la réouverture.
 
 ---
 
-## 9. Sauvegardes
+## 10. Sauvegardes
 
 - `donnees/snapshot.json` dans OneDrive : photo lisible de toutes les données,
   réécrite à chaque synchronisation du PC.
@@ -178,7 +270,7 @@ dessus force une synchronisation.
 
 ---
 
-## 10. Dépannage
+## 11. Dépannage
 
 | Situation | Que faire |
 |---|---|
@@ -188,14 +280,19 @@ dessus force une synchronisation.
 | « Accès suspendu » | Un administrateur a bloqué ce compte. Lui seul peut le débloquer (Réglages → Comptes → Débloquer). |
 | « Ce compte n'existe plus » | Le compte a été supprimé. Il faut en recréer un depuis « Première fois ici ». |
 | Connecté mais tout est en lecture seule | Votre compte est en consultation ; un administrateur peut changer votre rôle |
-| « n à envoyer » qui persiste | Pas de réseau, ou session expirée : déconnectez-vous et reconnectez-vous |
+| « Hors ligne » | Normal : l'appareil n'a pas de réseau. Tout repartira seul. |
+| « n à envoyer » qui persiste malgré le réseau | Cliquez sur la pastille ; si cela persiste, déconnectez-vous et reconnectez-vous |
 | Le PC affiche « Base en ligne à jour » sans OneDrive | Réglages → Relier le dossier OneDrive |
 | Un adhérent ne peut pas saisir | C'est voulu : la saisie est réservée aux administrateurs |
 | Un adhérent ne voit pas les Réglages complets | C'est voulu : la gestion des comptes est réservée aux administrateurs |
+| Une cotisation n'a pas de moyen (cercle vide) | Normal pour les données reprises du classeur ; cliquez sur la pastille pour le renseigner |
+| Le mauvais moyen a été enregistré | Cliquez sur la pastille de la case et corrigez-le dans le détail |
+| Une déclaration n'apparaît pas chez le trésorier | Elle a été retirée par son auteur, ou le tableau de bord n'a pas encore été rouvert |
+| L'adhérent n'a pas le bouton « Déclarer » | Son compte n'est pas encore approuvé, ou l'application tourne sans base en ligne |
 
 ---
 
-## 11. Un écart hérité du classeur
+## 12. Un écart hérité du classeur
 
 La feuille *Statistiques* affichait un solde final de **400 000** alors que le
 total des cotisations est de **402 000** : les 2 000 FCFA de Geordi n'y
