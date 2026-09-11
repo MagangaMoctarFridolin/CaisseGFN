@@ -214,10 +214,11 @@ export function blocDeclarationsAValider(ctx) {
 
   const dessiner = (liste) => {
     const attente = liste.filter((d) => d.statut === 'attente');
-    titre.replaceChildren('Versements déclarés', attente.length
+    // replaceChildren écrirait « null » en toutes lettres : on filtre avant.
+    titre.replaceChildren(...['Versements déclarés', attente.length
       ? h('span', { class: 'etiquette attente', style: 'margin-left:.5rem' },
           attente.length + ' à traiter')
-      : null);
+      : null].filter(Boolean));
 
     if (!liste.length) {
       corps.replaceChildren(h('p', { class: 'doux', style: 'margin:.2rem 0 0' },
