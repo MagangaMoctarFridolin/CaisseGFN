@@ -15,7 +15,7 @@
    ========================================================================== */
 
 import * as DB from './db.js';
-import { h, formulaire, toast, confirmer } from './ui.js';
+import { h, formulaire, toast, confirmer, coordonneesCanal } from './ui.js';
 
 const SEL = 'tontine-gfn-v1';
 
@@ -190,6 +190,8 @@ export function fichierConsultation(etat, styles) {
     }).join('');
 
   const totMois = DB.parMois(etat, annee);
+  const moyens = DB.canaux(etat);
+  const repartition = DB.parMoyen(etat, annee).filter((l) => l.montant);
 
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -201,9 +203,14 @@ body{padding:0}main{max-width:1000px;margin:0 auto;padding:1rem}
 </style></head><body>
 <div class="bandeau"><h1>${echapper(etat.association.nom)}</h1>
 <p>Situation au ${new Date().toLocaleDateString('fr-FR')} — document de consultation, non modifiable</p></div>
-${etat.association.airtelMoney ? `<div style="background:var(--accent-clair);padding:.8rem 1rem;text-align:center">
-<span style="font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--accent)">Cotisations par Airtel Money</span>
-<div style="font-size:1.5rem;font-weight:700;color:var(--accent)">${echapper(etat.association.airtelMoney)}</div></div>` : ''}
+${moyens.length ? `<div style="background:var(--accent-clair);padding:.8rem 1rem;text-align:center">
+<span style="font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--accent)">${
+  moyens.length > 1 ? 'Où verser sa cotisation' : 'Cotisations par ' + echapper(moyens[0].nom)}</span>
+<div style="display:flex;flex-wrap:wrap;gap:.4rem 2rem;justify-content:center;margin-top:.35rem">${
+  moyens.map((c) => `<div>${moyens.length > 1
+    ? `<div style="font-size:.8rem;color:var(--accent);opacity:.85">${echapper(c.nom)}</div>` : ''}
+<div style="font-size:1.4rem;font-weight:700;color:var(--accent)">${
+  echapper(coordonneesCanal(c) || c.nom)}</div></div>`).join('')}</div></div>` : ''}
 <main>
 <div class="grille" style="margin-bottom:1rem">
   <div class="stat"><div class="libelle">Cotisations ${annee}</div><div class="valeur">${nb(t.totalCotisations)} ${dev}</div></div>
@@ -217,6 +224,11 @@ ${etat.association.airtelMoney ? `<div style="background:var(--accent-clair);pad
 <tfoot><tr class="total"><td class="nom">Total</td>${totMois.map((m) => `<td class="num">${m ? nb(m) : '—'}</td>`).join('')}
 <td class="num">${nb(totMois.reduce((s, x) => s + x, 0))}</td><td class="num">${nb(global.totalCotisations)}</td></tr></tfoot>
 </table></div></div>
+${repartition.length > 1 || repartition.some((l) => l.id) ? `<div class="carte"><h2>Par quel moyen, en ${annee}</h2>
+<table><thead><tr><th>Moyen</th><th class="num">Versements</th><th class="num">Montant</th><th class="num">Part</th></tr></thead>
+<tbody>${repartition.map((l) => `<tr><td>${echapper(l.nom)}</td><td class="num">${l.nombre}</td>
+<td class="num">${nb(l.montant)}</td><td class="num">${
+  ((l.montant / (t.totalCotisations || 1)) * 100).toFixed(1)} %</td></tr>`).join('')}</tbody></table></div>` : ''}
 <p class="doux">Document produit par l’application de gestion de la tontine. Pour toute correction, contactez le trésorier.</p>
 </main></body></html>`;
 }
