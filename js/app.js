@@ -16,6 +16,7 @@ import * as DB from './db.js';
 import { Synchro } from './synchro.js';
 import * as UI from './ui.js';
 import * as Comptes from './comptes.js';
+import * as Declarations from './declarations.js';
 import { CONFIG } from '../config.js';
 
 const { h, toast } = UI;
@@ -71,6 +72,11 @@ function contexte() {
     blocComptes: surServeur
       ? Comptes.blocComptesServeur
       : (estAdmin ? Comptes.blocComptes : null),
+    // Les déclarations de versement n'existent qu'avec la base en ligne :
+    // il faut un serveur pour recevoir ce que l'adhérent annonce sans lui
+    // ouvrir le journal des écritures.
+    blocDeclarations: !surServeur || !approuve ? null
+      : (estAdmin ? Declarations.blocDeclarationsAValider : Declarations.blocMesDeclarations),
     deconnexion() {
       if (surServeur) { synchro.deconnecter('supabase'); localStorage.removeItem('tontine:supabase:vu'); }
       else Comptes.fermerSession();
@@ -199,7 +205,14 @@ function majEtatSynchro() {
   const z = document.getElementById('etatSynchro');
   if (!z) return;
   let classe, texte;
-  if (synchro.enCours) { classe = ''; texte = 'Synchronisation…'; }
+  const horsLigne = typeof navigator !== 'undefined' && navigator.onLine === false;
+  if (horsLigne) {
+    // Dire la vérité plutôt que « synchro à refaire » : rien n'est perdu,
+    // tout repartira au retour du réseau.
+    classe = 'hors';
+    texte = synchro.nbEnAttente ? `Hors ligne — ${synchro.nbEnAttente} en attente` : 'Hors ligne';
+  }
+  else if (synchro.enCours) { classe = ''; texte = 'Synchronisation…'; }
   else if (synchro.nbEnAttente) { classe = 'souci'; texte = `${synchro.nbEnAttente} à envoyer`; }
   else if (synchro.erreur) { classe = 'souci'; texte = 'Synchro à refaire'; }
   else if (synchro.distants.length) {
@@ -235,7 +248,8 @@ async function demarrer() {
 
   setInterval(() => { if (!document.hidden) synchro.synchroniser(); }, 90_000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) synchro.synchroniser(); });
-  window.addEventListener('online', () => synchro.synchroniser());
+  window.addEventListener('online', () => { majEtatSynchro(); synchro.synchroniser(); });
+  window.addEventListener('offline', majEtatSynchro);
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
