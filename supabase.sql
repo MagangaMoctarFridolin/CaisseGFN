@@ -257,3 +257,63 @@ begin
   update public.profils set valide = true where id = auth.uid();
   return true;
 end; $$;
+
+-- ===========================================================================
+--  Déclarations de versement
+--
+--  L'adhérent ne saisit toujours rien dans les comptes : le journal reste
+--  fermé à l'écriture pour lui. Mais il peut DÉCLARER un versement qu'il vient
+--  de faire — montant, mois, moyen, numéro de téléphone, référence de la
+--  transaction. La déclaration arrive dans une table à part, en attente.
+--
+--  C'est l'administrateur qui la valide, et c'est sa validation — pas la
+--  déclaration — qui écrit la cotisation dans le journal. La frontière entre
+--  « ce que dit l'adhérent » et « ce que dit la caisse » reste donc entière.
+-- ===========================================================================
+
+create table if not exists public.declarations (
+  id            uuid primary key default gen_random_uuid(),
+  auteur        uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  nom           text not null,                 -- nom déclaré, recopié du profil
+  adherent_id   text,                          -- fiche adhérent, si le profil y est relié
+  annee         int  not null,
+  mois          int  not null check (mois between 1 and 12),
+  montant       numeric not null check (montant > 0),
+  moyen         text,                          -- identifiant du canal (airtel, especes…)
+  reference     text,                          -- référence de la transaction
+  telephone     text,
+  note          text,
+  statut        text not null default 'attente'
+                  check (statut in ('attente', 'validee', 'refusee')),
+  motif         text,                          -- rempli en cas de refus
+  cotisation_id text,                          -- la cotisation créée à la validation
+  cree_le       timestamptz not null default now(),
+  traite_le     timestamptz,
+  traite_par    uuid references auth.users (id) on delete set null
+);
+
+create index if not exists declarations_statut_idx on public.declarations (statut, cree_le);
+create index if not exists declarations_auteur_idx on public.declarations (auteur);
+
+alter table public.declarations enable row level security;
+
+-- Chacun voit les siennes ; l'administrateur voit tout.
+drop policy if exists declarations_lecture on public.declarations;
+create policy declarations_lecture on public.declarations for select to authenticated
+  using (auteur = auth.uid() or public.est_admin());
+
+-- On ne déclare que pour soi, et seulement si l'on a accès à l'application.
+drop policy if exists declarations_depot on public.declarations;
+create policy declarations_depot on public.declarations for insert to authenticated
+  with check (auteur = auth.uid() and public.est_valide());
+
+-- Valider ou refuser est réservé à l'administrateur.
+drop policy if exists declarations_traitement on public.declarations;
+create policy declarations_traitement on public.declarations for update to authenticated
+  using (public.est_admin()) with check (public.est_admin());
+
+-- Un adhérent peut retirer une déclaration qu'il vient de déposer, tant qu'elle
+-- n'a pas été traitée. L'administrateur, lui, peut faire le ménage.
+drop policy if exists declarations_retrait on public.declarations;
+create policy declarations_retrait on public.declarations for delete to authenticated
+  using (public.est_admin() or (auteur = auth.uid() and statut = 'attente'));
