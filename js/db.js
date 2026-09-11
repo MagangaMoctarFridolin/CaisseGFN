@@ -21,6 +21,8 @@ export const ETAT_VIDE = () => ({
   association: {
     nom: 'LA GRANDE FAMILLE NIELILI', adresse: 'Libreville',
     telephone: '', email: '', airtelMoney: '',
+    // Moyens de versement proposés aux adhérents — voir canaux() plus bas.
+    canaux: [],
     anneeDemarrage: new Date().getFullYear(), devise: 'FCFA'
   },
   adherents: [], cotisations: [], prets: [], mouvements: [], comptes: []
@@ -164,6 +166,68 @@ export function anneesConnues(etat) {
 
 export function nomComplet(a) {
   return [a?.prenom, a?.nom].filter(Boolean).join(' ') || a?.numero || '—';
+}
+
+/* --------------------------------------------------- moyens de versement --- */
+
+/**
+ * Les moyens par lesquels un adhérent verse sa cotisation : Airtel Money,
+ * espèces remises au trésorier, virement…
+ *
+ * Ils vivent dans la fiche de l'association, donc dans le journal comme tout
+ * le reste : les changer est un événement, pas une migration. Les bases
+ * antérieures ne connaissaient qu'un numéro Airtel ; on le reprend ici sous
+ * forme de canal, pour que rien ne se perde et qu'aucune reprise ne soit
+ * nécessaire.
+ */
+export const CANAL_AUTRE = { id: 'autre', nom: 'Non précisé', type: 'autre', actif: false };
+
+export function canaux(etat, toutMontrer = false) {
+  const liste = etat?.association?.canaux;
+  if (Array.isArray(liste) && liste.length) {
+    return toutMontrer ? liste : liste.filter((c) => c.actif !== false);
+  }
+  const ancien = etat?.association?.airtelMoney;
+  if (ancien) {
+    return [{ id: 'airtel', nom: 'Airtel Money', type: 'mobile', numero: ancien, actif: true }];
+  }
+  return [];
+}
+
+export function canal(etat, id) {
+  if (!id) return null;
+  return canaux(etat, true).find((c) => c.id === id) || null;
+}
+
+/** Nom lisible d'un moyen, même s'il a été supprimé depuis la saisie. */
+export function nomCanal(etat, id) {
+  if (!id) return 'Non précisé';
+  return canal(etat, id)?.nom || 'Moyen supprimé';
+}
+
+/** Abrégé de deux ou trois lettres, pour le repère affiché dans les cases. */
+export function codeCanal(nom) {
+  const mots = String(nom || '').trim().split(/[\s'’-]+/).filter(Boolean);
+  if (!mots.length) return '—';
+  if (mots.length === 1) return mots[0].slice(0, 3).toUpperCase();
+  return mots.slice(0, 2).map((m) => m[0]).join('').toUpperCase();
+}
+
+/**
+ * Répartition des cotisations d'une année par moyen de versement.
+ * Renvoie [{ id, nom, montant, nombre }], du plus gros au plus petit.
+ */
+export function parMoyen(etat, annee) {
+  const cumul = new Map();
+  for (const c of etat.cotisations) {
+    if (annee != null && c.annee !== annee) continue;
+    const id = c.moyen || '';
+    const ligne = cumul.get(id) || { id, nom: nomCanal(etat, id), montant: 0, nombre: 0 };
+    ligne.montant += +c.montant || 0;
+    ligne.nombre += 1;
+    cumul.set(id, ligne);
+  }
+  return [...cumul.values()].sort((a, b) => b.montant - a.montant);
 }
 
 /* ------------------------------------------------------------------- formats */
