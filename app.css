@@ -133,6 +133,24 @@ table.saisie input:focus { border-color: var(--accent); background: var(--carte)
 table.saisie td.nom { font-weight: 600; white-space: nowrap; position: sticky; left: 0;
   background: var(--carte); border-right: 1px solid var(--trait); }
 
+/* pastille du moyen de versement, dans le coin de chaque case */
+table.saisie td.cellule { position: relative; }
+table.saisie td.cellule.avec-repere input { padding-right: .72rem; }
+table.saisie td.cellule input { width: 100%; min-width: 4.6rem; }
+.repere {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  border: 0; padding: 0; background: var(--accent); cursor: pointer;
+}
+table.saisie .repere { position: absolute; right: .22rem; top: 50%; transform: translateY(-50%); }
+button.repere:hover { box-shadow: 0 0 0 3px var(--accent-clair); }
+.repere.vague { background: transparent; box-shadow: inset 0 0 0 1.5px var(--doux); opacity: .5; }
+td.num .repere { position: static; transform: none; margin-left: .35rem; cursor: default; }
+.legende-moyens { display: flex; flex-wrap: wrap; gap: .3rem 1rem; margin: .6rem 0 0; }
+.legende-moyens > span { display: inline-flex; align-items: center; gap: .35rem; }
+.legende-moyens .repere { cursor: default; }
+.choix-moyen { display: inline-flex; align-items: center; gap: .35rem; }
+.choix-moyen select { width: auto; }
+
 /* fenêtre modale */
 dialog {
   border: 0; border-radius: var(--rayon); padding: 0; background: var(--carte); color: var(--texte);
