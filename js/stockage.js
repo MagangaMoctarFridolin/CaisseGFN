@@ -24,6 +24,39 @@
 
 const DOSSIER_DONNEES = 'donnees';
 
+/* --------------------------------------------------------- réseau incertain
+   Une connexion mobile qui faiblit ne doit ni bloquer l'application, ni faire
+   croire à une panne. Trois précautions, appliquées à tous les appels en
+   ligne :
+     • un délai maximum : au-delà, la requête est abandonnée. Sans cela, une
+       requête suspendue laisse la synchronisation « en cours » pour toujours
+       et plus rien ne repart ;
+     • une reprise automatique quand c'est le réseau qui a lâché, jamais quand
+       c'est le serveur qui a répondu « non » — retenter un refus est inutile ;
+     • un message qui dit ce qui s'est passé, en français.
+   ------------------------------------------------------------------------ */
+
+const DELAI_REQUETE = 20_000;
+const PAUSE_REPRISE = 1200;
+
+export async function fetchReseau(url, options = {}, essais = 2) {
+  const { reessayable, ...reste } = options;
+  for (let i = 0; i < essais; i++) {
+    const frein = new AbortController();
+    const minuteur = setTimeout(() => frein.abort(), DELAI_REQUETE);
+    try {
+      return await fetch(url, { ...reste, signal: frein.signal });
+    } catch {
+      // On n'arrive ici que si la requête n'a PAS abouti : coupure, DNS,
+      // délai dépassé. Une réponse HTTP, même 500, ne passe pas par là.
+      if (i < essais - 1) await new Promise((r) => setTimeout(r, PAUSE_REPRISE * (i + 1)));
+    } finally { clearTimeout(minuteur); }
+  }
+  throw new Error(navigator.onLine
+    ? 'Le serveur ne répond pas. Nouvel essai à la prochaine synchronisation.'
+    : 'Pas de connexion : vos saisies restent sur cet appareil et partiront au retour du réseau.');
+}
+
 /* ------------------------------------------------------- petit magasin IndexedDB
    (uniquement pour conserver l'autorisation d'accès au dossier Windows) */
 
@@ -343,7 +376,7 @@ export class StockageSupabase {
    * decide) ; les suivants arrivent en attente d'approbation.
    */
   async inscrire(email, motDePasse, nom) {
-    const r = await fetch(`${this.url}/auth/v1/signup`, {
+    const r = await fetchReseau(`${this.url}/auth/v1/signup`, {
       method: 'POST',
       headers: { apikey: this.cle, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -382,7 +415,7 @@ export class StockageSupabase {
   }
 
   async connecter(email, motDePasse) {
-    const r = await fetch(`${this.url}/auth/v1/token?grant_type=password`, {
+    const r = await fetchReseau(`${this.url}/auth/v1/token?grant_type=password`, {
       method: 'POST',
       headers: { apikey: this.cle, 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: (email || '').trim(), password: motDePasse })
@@ -400,25 +433,36 @@ export class StockageSupabase {
   async #jeton() {
     if (!this.session) throw new Error('Non connecté.');
     if (Date.now() < this.session.expire) return this.session.access_token;
-    const r = await fetch(`${this.url}/auth/v1/token?grant_type=refresh_token`, {
+    const r = await fetchReseau(`${this.url}/auth/v1/token?grant_type=refresh_token`, {
       method: 'POST',
       headers: { apikey: this.cle, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: this.session.refresh_token })
+      body: JSON.stringify({ refresh_token: this.session.refresh_token }),
+      reessayable: true
     });
-    if (!r.ok) { this.deconnecter(); throw new Error('Session expirée, reconnectez-vous.'); }
+    if (!r.ok) {
+      // Le serveur en panne n'est pas une session expirée : on garde la
+      // session et on réessaiera. Seul un vrai refus referme la session.
+      if (r.status >= 500) throw new Error('La base en ligne ne répond pas pour le moment.');
+      this.deconnecter();
+      throw new Error('Session expirée, reconnectez-vous.');
+    }
     this.#garder(await r.json());
     return this.session.access_token;
   }
 
   async #appel(chemin, options = {}) {
     const jeton = await this.#jeton();
-    const r = await fetch(this.url + chemin, {
+    // On ne rejoue d'office qu'une lecture : rejouer une écriture dont la
+    // réponse s'est perdue créerait un doublon. Les écritures sûres — celles
+    // qui portent un identifiant fourni par l'appareil — le disent.
+    const rejouable = !options.method || options.method === 'GET' || options.reessayable;
+    const r = await fetchReseau(this.url + chemin, {
       ...options,
       headers: {
         apikey: this.cle, Authorization: 'Bearer ' + jeton,
         'Content-Type': 'application/json', ...(options.headers || {})
       }
-    });
+    }, rejouable ? 2 : 1);
     if (!r.ok) {
       const texte = await r.text().catch(() => '');
       // Un refus posé par une fonction du serveur (raise exception) arrive avec
@@ -473,6 +517,9 @@ export class StockageSupabase {
     for (let i = 0; i < evenements.length; i += 200) {
       await this.#appel('/rest/v1/evenements', {
         method: 'POST',
+        // Chaque événement porte son identifiant et la base ignore les
+        // doublons : renvoyer deux fois le même lot est sans conséquence.
+        reessayable: true,
         headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
         body: JSON.stringify(evenements.slice(i, i + 200).map((e) => ({
           id: e.id, ts: e.ts, appareil: e.appareil,
@@ -527,6 +574,49 @@ export class StockageSupabase {
                              adherent_id: profil.adherent_id || null,
                              valide: !!profil.valide, bloque: !!profil.bloque })
     });
+  }
+
+  /* ------------------------------------------- déclarations de versement */
+
+  /**
+   * Dépôt d'une déclaration par un adhérent. Ce n'est pas une écriture dans
+   * les comptes : c'est une demande, que l'administrateur validera ou non.
+   * La base n'accepte la ligne que si l'auteur est bien celui qui la dépose.
+   */
+  async declarer(d) {
+    const r = await this.#appel('/rest/v1/declarations', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        auteur: this.session?.utilisateur?.id,
+        nom: this.profil?.nom || '',
+        adherent_id: this.profil?.adherent_id || null,
+        annee: d.annee, mois: d.mois, montant: d.montant,
+        moyen: d.moyen || null, reference: d.reference || null,
+        telephone: d.telephone || null, note: d.note || null
+      })
+    });
+    return (await r.json())[0];
+  }
+
+  /** L'adhérent ne voit que les siennes : c'est la base qui filtre. */
+  async listerDeclarations(statut) {
+    const filtre = statut ? `&statut=eq.${statut}` : '';
+    const r = await this.#appel(
+      `/rest/v1/declarations?select=*${filtre}&order=cree_le.desc&limit=200`);
+    return r.json();
+  }
+
+  async majDeclaration(id, champs) {
+    await this.#appel(`/rest/v1/declarations?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify(champs)
+    });
+  }
+
+  async supprimerDeclaration(id) {
+    await this.#appel(`/rest/v1/declarations?id=eq.${id}`, { method: 'DELETE' });
   }
 
   /**
