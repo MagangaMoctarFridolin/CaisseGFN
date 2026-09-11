@@ -193,8 +193,14 @@ export class Synchro extends EventTarget {
   /* --------------------------------------------------------------- lecture */
 
   async synchroniser() {
-    if (!this.distants.length || this.enCours) return;
-    this.enCours = true; this.prevenir();
+    if (!this.distants.length) return;
+    // Filet de sécurité : si une synchronisation reste suspendue (réseau coupé
+    // en plein transfert, dossier OneDrive qui ne répond plus), on ne doit pas
+    // rester bloqué pour le reste de la séance. Passé deux minutes, on repart.
+    if (this.enCours) {
+      if (Date.now() - (this.debutSynchro || 0) < 120_000) return;
+    }
+    this.enCours = true; this.debutSynchro = Date.now(); this.prevenir();
     try {
       // Relire le profil à chaque passage : un compte approuvé, bloqué ou
       // supprimé pendant que l'application est ouverte s'en aperçoit dans la
