@@ -94,7 +94,11 @@ Le téléphone lit et écrit dans la base en ligne. Il ne touche pas directement
 ## 5. Les comptes
 
 - **Administrateur** (deux) — saisit les cotisations, les prêts, la
-  comptabilité, gère les adhérents et les comptes.
+  comptabilité, gère les adhérents et les comptes. En pratique : vous, qui
+  tenez l'outil, et le trésorier, qui vérifie les encaissements et valide les
+  versements déclarés. Le trésorier crée son compte comme tout le monde, puis
+  vous lui donnez le rôle *administrateur* dans **Réglages → Comptes →
+  Modifier**.
 - **Adhérent approuvé** — consulte, **imprime et exporte** : tableau de bord,
   cotisations, prêts, comptabilité, rapport annuel, fiche individuelle, export
   CSV pour Excel, et le fichier de consultation à partager. Il ne saisit rien.
@@ -193,8 +197,9 @@ de téléphone et la référence de la transaction Airtel. C'est envoyé, et il 
 sa déclaration passer « en attente ». Tant qu'elle n'est pas traitée, il peut la
 retirer s'il s'est trompé.
 
-**Côté trésorier**, la déclaration apparaît en haut de votre tableau de bord,
-avec le nombre de déclarations « à traiter » :
+**Côté administrateur** — vous, et le trésorier dès qu'il aura son compte — la
+déclaration apparaît en haut du tableau de bord, avec le nombre de
+déclarations « à traiter » :
 
 - **Valider** — vous vérifiez sur votre relevé Airtel que l'argent est bien
   arrivé, vous reliez la déclaration à la fiche de l'adhérent, et vous validez.
