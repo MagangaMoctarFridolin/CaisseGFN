@@ -3,7 +3,7 @@
    (cache local du navigateur + OneDrive). Ici, on ne met en cache que
    l'application elle-même. */
 
-const CACHE = 'tontine-app-v4';
+const CACHE = 'tontine-app-v5';
 const FICHIERS = [
   '.', 'index.html', 'app.css', 'config.js',
   'js/app.js', 'js/db.js', 'js/ui.js', 'js/synchro.js', 'js/stockage.js', 'js/comptes.js', 'js/declarations.js',
