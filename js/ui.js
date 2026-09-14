@@ -266,7 +266,8 @@ export function vueAdherents(ctx) {
             .sort((a, b) => (a.numero || '').localeCompare(b.numero || ''))
             .map((a) => h('tr', {},
               h('td', {}, a.numero),
-              h('td', {}, nomComplet(a), a.actif === false ? ' ' : '',
+              h('td', {}, nomComplet(a), ' ',
+                a.fonction ? h('span', { class: 'etiquette' }, DB.nomFonction(a.fonction)) : null,
                 a.actif === false ? h('span', { class: 'etiquette attente' }, 'inactif') : null),
               h('td', { class: 'doux' }, [a.telephone, a.email].filter(Boolean).join(' · ') || '—'),
               h('td', { class: 'doux' }, fmtDate(a.dateAdhesion)),
@@ -573,6 +574,18 @@ export function vueComptabilite(ctx) {
 
 /* ================================================================ rapports === */
 
+/** Les lignes de signature d'un document officiel, d'après le bureau nommé. */
+function blocSignatures(etat) {
+  const tenues = DB.FONCTIONS.filter((f) => DB.titulaire(etat, f.cle));
+  const aSigner = tenues.length ? tenues : DB.FONCTIONS.filter((f) => f.cle !== 'commissaire');
+  return h('div', { style: 'display:flex;flex-wrap:wrap;gap:2.5rem;margin-top:3rem' },
+    aSigner.map((f) => h('div', { style: 'min-width:14rem' },
+      h('div', { class: 'doux' }, f.nom),
+      h('div', { style: 'margin-top:.2rem' },
+        DB.titulaire(etat, f.cle) ? nomComplet(DB.titulaire(etat, f.cle)) : '\u00a0'),
+      h('div', { style: 'border-bottom:1px solid var(--trait);margin-top:2.2rem' }))));
+}
+
 /**
  * Par où l'argent est entré cette année. Utile au moment de rapprocher la
  * caisse : tant par Airtel Money, tant en espèces.
@@ -637,7 +650,7 @@ export function vueRapports(ctx) {
           h('td', {}, fmtDate(p.dateOctroi) + (p.objet ? ' — ' + p.objet : '')),
           h('td', { class: 'num' }, fmtNombre(p.montant)),
           h('td', { class: 'num' }, 'reste ' + fmtNombre(DB.encoursPret(p)))))))) : null,
-      h('p', { style: 'margin-top:2.5rem' }, 'Signature du trésorier : ______________________')));
+      h('p', { style: 'margin-top:2.5rem' }, DB.ligneSignature(etat, 'tresorier'))));
     zone.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
@@ -660,7 +673,8 @@ export function vueRapports(ctx) {
             h('td', { class: 'num' }, fmtMontant(mois.reduce((s, x) => s + x, 0), dev))))),
       tableauMoyens(etat, annee, dev),
       h('h3', { style: 'margin-top:1rem' }, 'Détail par adhérent'),
-      tableauApports(ctx)));
+      tableauApports(ctx),
+      blocSignatures(etat)));
     zone.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
@@ -761,6 +775,56 @@ function blocCodeAdhesion(ctx) {
       h('button', { class: 'primaire', onClick: modifier }, 'Changer le code')),
     h('p', { class: 'doux' },
       'Changez-le si quelqu’un le diffuse trop largement : les comptes déjà créés ne sont pas affectés.'));
+}
+
+/* ------------------------------------------------ bureau de l'association --- */
+
+/**
+ * Nommer le bureau : une fonction, un nom. C'est un TITRE, pas un droit —
+ * le droit d'écrire se règle séparément, dans la carte « Comptes », et c'est
+ * le serveur qui l'applique. Les deux sont volontairement distincts : on peut
+ * être commissaire aux comptes sans jamais rien saisir, et l'inverse aussi.
+ */
+function blocBureau(ctx) {
+  const { etat } = ctx;
+  const admin = ctx.estAdmin;
+
+  const nommer = (fonction, adherentId) => {
+    // Une fonction n'est occupée que par une personne : on libère l'ancienne.
+    const sortant = DB.titulaire(etat, fonction.cle);
+    if (sortant && sortant.id !== adherentId) {
+      ctx.enregistrer('adherent', 'upsert', { ...sortant, fonction: '' });
+    }
+    if (adherentId) {
+      const entrant = etat.adherents.find((a) => a.id === adherentId);
+      if (entrant) ctx.enregistrer('adherent', 'upsert', { ...entrant, fonction: fonction.cle });
+    }
+    toast(adherentId ? fonction.nom + ' nommé.' : fonction.nom + ' : place laissée vacante.');
+  };
+
+  const lignes = DB.FONCTIONS.map((f) => {
+    const qui = DB.titulaire(etat, f.cle);
+    const choix = h('select', {
+      onChange: (e) => nommer(f, e.target.value)
+    }, [h('option', { value: '', selected: !qui }, '— vacant —'),
+        ...[...etat.adherents]
+          .sort((a, b) => (a.numero || '').localeCompare(b.numero || ''))
+          .map((a) => h('option', { value: a.id, selected: qui?.id === a.id }, nomComplet(a)))]);
+    return h('tr', {},
+      h('td', {}, f.nom),
+      h('td', {}, admin ? choix
+        : h('span', qui ? {} : { class: 'doux' }, qui ? nomComplet(qui) : '— vacant —')));
+  });
+
+  return h('div', { class: 'carte' },
+    h('h2', {}, 'Bureau de l’association'),
+    h('p', { class: 'doux' },
+      'Qui occupe quelle fonction. C’est un titre, et rien d’autre : il apparaît en face du nom dans la liste des adhérents, et il remplit les lignes de signature des documents imprimés. Le droit de saisir, lui, se règle plus bas dans « Comptes » — et c’est le serveur qui l’applique.'),
+    h('div', { class: 'defilable' }, h('table', { class: 'bureau' },
+      h('thead', {}, h('tr', {}, h('th', {}, 'Fonction'), h('th', {}, 'Titulaire'))),
+      h('tbody', {}, lignes))),
+    etat.adherents.length ? null
+      : h('p', { class: 'doux' }, 'Ajoutez d’abord des adhérents : les fonctions se donnent à des personnes déjà inscrites.'));
 }
 
 /* ------------------------------------------------- moyens de versement --- */
@@ -886,6 +950,8 @@ export function vueReglages(ctx) {
     admin && ctx.surServeur ? blocCodeAdhesion(ctx) : null,
 
     ctx.blocComptes ? ctx.blocComptes(ctx) : null,
+
+    blocBureau(ctx),
 
     blocMoyens(ctx),
 
