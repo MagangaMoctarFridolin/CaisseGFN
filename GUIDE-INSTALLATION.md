@@ -136,7 +136,32 @@ le rôle.
 
 ---
 
-## 6. Les moyens de versement
+## 6. Le bureau : qui est qui
+
+Dans **Réglages → Bureau de l'association**, vous nommez le président, le
+trésorier, le secrétaire et le commissaire aux comptes. Une fonction, un nom ;
+nommer quelqu'un libère automatiquement celui qui occupait la place.
+
+**C'est un titre, pas un droit** — et la distinction compte. Nommer quelqu'un
+trésorier ne lui donne pas le droit de saisir : ça se règle séparément, dans
+**Réglages → Comptes → Modifier → Rôle**. Les deux sont volontairement
+distincts, parce que la base de données ne sait appliquer que deux niveaux,
+administrateur ou consultation. Un droit « trésorier » qu'elle n'appliquerait
+pas serait du décor : il rassurerait sans protéger.
+
+La conséquence pratique est utile : votre commissaire aux comptes peut porter
+son titre tout en restant en consultation, et une personne sans adresse e-mail
+— donc sans compte — peut parfaitement figurer au bureau.
+
+Une fois le bureau nommé, la fonction s'affiche en face du nom dans l'onglet
+Adhérents, la fiche individuelle imprimée se termine par *« Signature du
+trésorier : Untel »* au lieu d'une ligne vide, le rapport annuel porte les
+cases de signature de chacun, et le fichier envoyé par WhatsApp rappelle en
+bas qui occupe quelle fonction.
+
+---
+
+## 7. Les moyens de versement
 
 Deux canaux sont en place au départ :
 
@@ -183,7 +208,7 @@ aussi la répartition.
 
 ---
 
-## 7. « J'ai versé » — les déclarations des adhérents
+## 8. « J'ai versé » — les déclarations des adhérents
 
 L'application **n'encaisse pas d'argent**. Elle ne demande pas un montant et un
 numéro pour envoyer un code de validation sur le téléphone : ce serait un
@@ -219,7 +244,7 @@ rapprochez du relevé, vous validez.
 
 ---
 
-## 8. Partager la situation par WhatsApp
+## 9. Partager la situation par WhatsApp
 
 **Réglages → Créer le fichier de consultation.**
 
@@ -234,7 +259,7 @@ souvent et par eux-mêmes.
 
 ---
 
-## 9. Réseau faible ou absent
+## 10. Réseau faible ou absent
 
 Tout continue de fonctionner. Les saisies s'accumulent sur l'appareil et
 partent dès que la connexion revient. La pastille en haut à droite dit où
@@ -263,7 +288,7 @@ le retour du réseau, elle est toujours là à la réouverture.
 
 ---
 
-## 10. Sauvegardes
+## 11. Sauvegardes
 
 - `donnees/snapshot.json` dans OneDrive : photo lisible de toutes les données,
   réécrite à chaque synchronisation du PC.
@@ -275,7 +300,7 @@ le retour du réseau, elle est toujours là à la réouverture.
 
 ---
 
-## 11. Dépannage
+## 12. Dépannage
 
 | Situation | Que faire |
 |---|---|
@@ -294,10 +319,12 @@ le retour du réseau, elle est toujours là à la réouverture.
 | Le mauvais moyen a été enregistré | Cliquez sur la pastille de la case et corrigez-le dans le détail |
 | Une déclaration n'apparaît pas chez le trésorier | Elle a été retirée par son auteur, ou le tableau de bord n'a pas encore été rouvert |
 | L'adhérent n'a pas le bouton « Déclarer » | Son compte n'est pas encore approuvé, ou l'application tourne sans base en ligne |
+| Nommé trésorier mais il ne peut rien saisir | C'est voulu : le titre ne donne pas le droit. Réglages → Comptes → Modifier → Rôle → Administrateur |
+| « Signature du trésorier : ______ » sur la fiche | Aucun trésorier n'est nommé : Réglages → Bureau de l'association |
 
 ---
 
-## 12. Un écart hérité du classeur
+## 13. Un écart hérité du classeur
 
 La feuille *Statistiques* affichait un solde final de **400 000** alors que le
 total des cotisations est de **402 000** : les 2 000 FCFA de Geordi n'y
