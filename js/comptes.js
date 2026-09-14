@@ -191,6 +191,9 @@ export function fichierConsultation(etat, styles) {
 
   const totMois = DB.parMois(etat, annee);
   const moyens = DB.canaux(etat);
+  const bureau = DB.FONCTIONS
+    .map((f) => ({ nom: f.nom, qui: DB.titulaire(etat, f.cle) }))
+    .filter((b) => b.qui);
   const repartition = DB.parMoyen(etat, annee).filter((l) => l.montant);
 
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8">
@@ -229,6 +232,8 @@ ${repartition.length > 1 || repartition.some((l) => l.id) ? `<div class="carte">
 <tbody>${repartition.map((l) => `<tr><td>${echapper(l.nom)}</td><td class="num">${l.nombre}</td>
 <td class="num">${nb(l.montant)}</td><td class="num">${
   ((l.montant / (t.totalCotisations || 1)) * 100).toFixed(1)} %</td></tr>`).join('')}</tbody></table></div>` : ''}
+${bureau.length ? `<p class="doux">${bureau.map((b) =>
+  `${echapper(b.nom)} : <strong>${echapper(DB.nomComplet(b.qui))}</strong>`).join(' &nbsp;·&nbsp; ')}</p>` : ''}
 <p class="doux">Document produit par l’application de gestion de la tontine. Pour toute correction, contactez le trésorier.</p>
 </main></body></html>`;
 }
@@ -449,8 +454,14 @@ export function blocComptesServeur(ctx) {
         : h('span', { class: 'etiquette' + (p.role === 'admin' ? '' : ' attente') },
             p.role === 'admin' ? 'administrateur' : 'consultation');
 
+      // La fonction vient de la fiche adhérent, pas du compte : c'est un titre
+      // dans l'association, pas un droit dans l'application.
+      const fiche = p.adherent_id
+        ? ctx.etat.adherents.find((a) => a.id === p.adherent_id) : null;
       return h('tr', {},
-        h('td', {}, p.nom, soi ? h('span', { class: 'doux' }, ' (vous)') : null),
+        h('td', {}, p.nom, soi ? h('span', { class: 'doux' }, ' (vous)') : null,
+          fiche?.fonction
+            ? h('div', { class: 'doux' }, DB.nomFonction(fiche.fonction)) : null),
         h('td', {}, etat),
         h('td', { class: 'doux' }, p.adherent_id
           ? DB.nomComplet(ctx.etat.adherents.find((a) => a.id === p.adherent_id)) : '—'),
@@ -483,7 +494,7 @@ export function blocComptesServeur(ctx) {
     h('h2', {}, 'Comptes'),
     h('p', { class: 'doux' },
       'Chacun crée son compte depuis l’écran de connexion, puis vous l’approuvez ici. Les droits sont appliqués par le serveur : un compte en consultation se voit refuser toute écriture, même si quelqu’un modifiait la page dans son navigateur.'),
-    h('div', { class: 'defilable' }, h('table', {},
+    h('div', { class: 'defilable' }, h('table', { class: 'comptes' },
       h('thead', {}, h('tr', {},
         h('th', {}, 'Nom'), h('th', {}, 'Rôle'), h('th', {}, 'Fiche adhérent'), h('th', {}, ''))),
       corps)),
