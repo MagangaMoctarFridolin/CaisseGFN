@@ -214,13 +214,16 @@ export class Synchro extends EventTarget {
       const soucis = [];
       for (const destination of this.distants) {
         try {
-          recoltes.push(await this.#tirer(destination));
+          recoltes.push({ destination, evts: await this.#tirer(destination) });
         } catch (e) { soucis.push(`${destination.etiquette()} : ${e.message}`); }
       }
 
+      await this.#relayer(recoltes);
+
       // On ne garde que ce qui ne vient pas de nous : notre journal fait foi.
       const miens = new Set(this.evenementsLocaux.map((e) => e.id));
-      this.evenementsDistants = DB.fusionner(...recoltes).filter((e) => !miens.has(e.id));
+      this.evenementsDistants = DB.fusionner(...recoltes.map((r) => r.evts))
+        .filter((e) => !miens.has(e.id));
       await this.local.ecrireFichier('cache-distant.jsonl', DB.ecrireJournal(this.evenementsDistants));
 
       this.recalculer();
@@ -232,6 +235,34 @@ export class Synchro extends EventTarget {
     } finally {
       this.enCours = false;
       this.prevenir();
+    }
+  }
+
+  /**
+   * Le PC fait le pont entre le dossier et la base en ligne.
+   *
+   * Il lit les deux. Si le dossier OneDrive contient une histoire que la base
+   * ignore — la reprise du classeur, ou les saisies d'un appareil qui n'a
+   * jamais vu le serveur — il la lui transmet. Sans cela, ce qui n'existe que
+   * dans OneDrive resterait invisible pour les téléphones : le PC afficherait
+   * onze adhérents, et eux aucun.
+   *
+   * L'opération est sans risque : chaque événement porte son identifiant et la
+   * base ignore les doublons. La rejouer ne crée rien en double.
+   */
+  async #relayer(recoltes) {
+    const connus = DB.fusionner(this.evenementsLocaux, ...recoltes.map((r) => r.evts));
+    for (const { destination, evts } of recoltes) {
+      if (destination.mode !== 'evenements') continue;
+      const chezElle = new Set(evts.map((e) => e.id));
+      const manquants = connus.filter((e) => !chezElle.has(e.id));
+      if (!manquants.length) continue;
+      try {
+        await destination.ecrireEvenements(manquants);
+      } catch {
+        // Un compte en consultation n'a pas le droit d'écrire : le serveur
+        // refuse, et c'est normal. Seul un administrateur fait le pont.
+      }
     }
   }
 
