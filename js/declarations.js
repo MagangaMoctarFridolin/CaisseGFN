@@ -16,9 +16,10 @@
    ========================================================================== */
 
 import * as DB from './db.js';
-import { h, formulaire, toast, confirmer } from './ui.js';
+import { h, formulaire, toast, confirmer, prochainNumero } from './ui.js';
 
 const CLE_TEL = 'tontine:telephone';
+const NOUVELLE = '__nouvelle__';
 
 const ETIQUETTES = {
   attente: { texte: 'en attente', classe: 'etiquette attente' },
@@ -162,9 +163,13 @@ export function blocDeclarationsAValider(ctx) {
     const options = etat.adherents.map((a) => ({ valeur: a.id, libelle: DB.nomComplet(a) }));
     const dejaLa = d.adherent_id ? cotisationExistante(d.adherent_id, d.annee, d.mois) : null;
     formulaire(`Valider le versement de ${d.nom}`, [
+      // Personne ne peut valider un versement sans savoir à qui l'attribuer.
+      // Or l'auteur d'une déclaration n'a pas forcément de fiche : il s'est
+      // inscrit avec le code, c'est tout. On lui en propose une sur place.
       { cle: 'adherentId', libelle: 'Adhérent concerné', type: 'select',
-        valeur: d.adherent_id || '',
-        options: [{ valeur: '', libelle: '— à choisir —' }, ...options] },
+        valeur: d.adherent_id || (options.length ? '' : NOUVELLE),
+        options: [{ valeur: '', libelle: '— à choisir —' }, ...options,
+          { valeur: NOUVELLE, libelle: '＋ créer la fiche de ' + d.nom }] },
       { cle: 'montant', libelle: dejaLa
           ? `Montant total du mois (${DB.fmtNombre(dejaLa.montant)} déjà inscrit)`
           : 'Montant à inscrire',
@@ -179,11 +184,31 @@ export function blocDeclarationsAValider(ctx) {
       if (!v.adherentId) return toast('Choisissez l’adhérent concerné.');
       const montant = Math.round(+v.montant || 0);
       if (montant <= 0) return toast('Montant invalide.');
-      const existante = cotisationExistante(v.adherentId, d.annee, d.mois);
+
+      let adherentId = v.adherentId;
+      if (adherentId === NOUVELLE) {
+        adherentId = DB.uid('adh');
+        try {
+          await synchro.enregistrer('adherent', 'upsert', {
+            id: adherentId, numero: prochainNumero(etat), prenom: d.nom, nom: '',
+            telephone: d.telephone || '', dateAdhesion: (d.cree_le || '').slice(0, 10),
+            actif: true
+          });
+          // Le compte de la personne pointe désormais vers sa fiche : la
+          // prochaine déclaration sera rattachée toute seule.
+          if (d.auteur) {
+            const profils = await synchro.supabase.listerProfils();
+            const compte = profils.find((x) => x.id === d.auteur);
+            if (compte) await synchro.supabase.majProfil({ ...compte, adherent_id: adherentId });
+          }
+        } catch (e) { return toast('Création de la fiche impossible : ' + e.message); }
+      }
+
+      const existante = cotisationExistante(adherentId, d.annee, d.mois);
       const id = existante?.id || DB.uid('cot');
       try {
         await synchro.enregistrer('cotisation', 'upsert', {
-          id, adherentId: v.adherentId, annee: d.annee, mois: d.mois,
+          id, adherentId, annee: d.annee, mois: d.mois,
           montant, moyen: v.moyen, reference: v.reference, date: v.date
         });
         await synchro.supabase.majDeclaration(d.id, {
