@@ -278,7 +278,7 @@ export function vueAdherents(ctx) {
                 h('button', { class: 'danger', onClick: () => supprimer(a) }, '✕')) : null)))))));
 }
 
-function prochainNumero(etat) {
+export function prochainNumero(etat) {
   const nums = etat.adherents.map((a) => /^([A-Za-z]*)(\d+)$/.exec(a.numero || '')).filter(Boolean);
   if (!nums.length) return 'GFN001';
   const prefixe = nums[0][1] || 'GFN';
