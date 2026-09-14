@@ -15,7 +15,7 @@
    ========================================================================== */
 
 import * as DB from './db.js';
-import { h, formulaire, toast, confirmer, coordonneesCanal } from './ui.js';
+import { h, formulaire, toast, confirmer, coordonneesCanal, prochainNumero } from './ui.js';
 
 const SEL = 'tontine-gfn-v1';
 
@@ -448,6 +448,31 @@ export function blocComptesServeur(ctx) {
         } catch (e) { toast(e.message); }
       };
 
+      // Un COMPTE n'est pas un ADHÉRENT : le premier est une connexion, le
+      // second une fiche dans le registre de la tontine. Quelqu'un peut très
+      // bien s'inscrire, déclarer un versement, et n'avoir aucune fiche — il
+      // n'apparaîtra alors pas dans l'onglet Adhérents. Ce bouton comble le
+      // fossé en une fois : il crée la fiche et l'attache au compte.
+      const creerFiche = () => formulaire('Créer la fiche adhérent de ' + p.nom, [
+        { cle: 'numero', libelle: 'N° adhérent', valeur: prochainNumero(ctx.etat), requis: true },
+        { cle: 'prenom', libelle: 'Nom affiché sur les tableaux', valeur: p.nom, requis: true },
+        { cle: 'telephone', libelle: 'Téléphone' },
+        { cle: 'dateAdhesion', libelle: "Date d'adhésion", type: 'date',
+          valeur: new Date().toISOString().slice(0, 10) }
+      ], async (v) => {
+        const id = DB.uid('adh');
+        try {
+          await synchro.enregistrer('adherent', 'upsert', {
+            id, numero: v.numero, prenom: v.prenom, nom: '',
+            telephone: v.telephone, dateAdhesion: v.dateAdhesion, actif: true
+          });
+          await synchro.supabase.majProfil({ ...p, adherent_id: id });
+          toast('Fiche créée et rattachée au compte.');
+          charger();
+          ctx.rafraichir();
+        } catch (e) { toast(e.message); }
+      });
+
       const soi = p.id === session?.id;
       const etat = p.bloque ? h('span', { class: 'etiquette retard' }, 'bloqué')
         : !p.valide ? h('span', { class: 'etiquette attente' }, 'en attente')
@@ -463,8 +488,11 @@ export function blocComptesServeur(ctx) {
           fiche?.fonction
             ? h('div', { class: 'doux' }, DB.nomFonction(fiche.fonction)) : null),
         h('td', {}, etat),
-        h('td', { class: 'doux' }, p.adherent_id
-          ? DB.nomComplet(ctx.etat.adherents.find((a) => a.id === p.adherent_id)) : '—'),
+        h('td', { class: 'doux' }, fiche
+          ? DB.nomComplet(fiche)
+          : (ctx.estAdmin && p.valide
+              ? h('button', { onClick: creerFiche }, 'Créer la fiche')
+              : h('span', { class: 'etiquette attente' }, 'sans fiche'))),
         h('td', { class: 'actions-compte', style: 'text-align:right;white-space:nowrap' },
           ...(!ctx.estAdmin ? [] : [
             !p.valide && !p.bloque
@@ -494,6 +522,8 @@ export function blocComptesServeur(ctx) {
     h('h2', {}, 'Comptes'),
     h('p', { class: 'doux' },
       'Chacun crée son compte depuis l’écran de connexion, puis vous l’approuvez ici. Les droits sont appliqués par le serveur : un compte en consultation se voit refuser toute écriture, même si quelqu’un modifiait la page dans son navigateur.'),
+    h('p', { class: 'doux' },
+      'Un compte n’est pas une fiche adhérent : le premier sert à se connecter, la seconde porte les cotisations. Tant qu’un compte n’a pas de fiche, la personne n’apparaît pas dans l’onglet Adhérents et ses versements ne peuvent pas être validés. La colonne « Fiche adhérent » vous le signale.'),
     h('div', { class: 'defilable' }, h('table', { class: 'comptes' },
       h('thead', {}, h('tr', {},
         h('th', {}, 'Nom'), h('th', {}, 'Rôle'), h('th', {}, 'Fiche adhérent'), h('th', {}, ''))),
