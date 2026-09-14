@@ -168,6 +168,45 @@ export function nomComplet(a) {
   return [a?.prenom, a?.nom].filter(Boolean).join(' ') || a?.numero || '—';
 }
 
+/* ------------------------------------------- fonctions dans l'association --- */
+
+/**
+ * Le bureau. À ne pas confondre avec les DROITS dans l'application :
+ *
+ *   • le droit (administrateur / consultation) dit ce que le SERVEUR autorise
+ *     à écrire. C'est la base de données qui l'applique, et elle ne connaît
+ *     que ces deux niveaux ;
+ *   • la fonction dit QUI EST QUI dans l'association. C'est un titre, porté
+ *     par une fiche adhérent — pas par un compte, car on peut très bien être
+ *     commissaire aux comptes sans adresse e-mail.
+ *
+ * Les deux se règlent séparément, volontairement : inventer un droit
+ * « trésorier » que la base n'appliquerait pas serait du décor.
+ */
+export const FONCTIONS = [
+  { cle: 'president',   nom: 'Président',              accord: 'du président' },
+  { cle: 'tresorier',   nom: 'Trésorier',              accord: 'du trésorier' },
+  { cle: 'secretaire',  nom: 'Secrétaire',             accord: 'du secrétaire' },
+  { cle: 'commissaire', nom: 'Commissaire aux comptes', accord: 'du commissaire aux comptes' }
+];
+
+export function nomFonction(cle) {
+  return FONCTIONS.find((f) => f.cle === cle)?.nom || '';
+}
+
+/** L'adhérent qui occupe une fonction, ou null si la place est vacante. */
+export function titulaire(etat, cle) {
+  return etat?.adherents?.find((a) => a.fonction === cle) || null;
+}
+
+/** « Signature du trésorier : Untel » — ou la ligne vierge si personne n'est nommé. */
+export function ligneSignature(etat, cle) {
+  const f = FONCTIONS.find((x) => x.cle === cle);
+  if (!f) return '';
+  const qui = titulaire(etat, cle);
+  return 'Signature ' + f.accord + ' : ' + (qui ? nomComplet(qui) : '______________________');
+}
+
 /* --------------------------------------------------- moyens de versement --- */
 
 /**
