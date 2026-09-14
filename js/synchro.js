@@ -251,7 +251,11 @@ export class Synchro extends EventTarget {
    * base ignore les doublons. La rejouer ne crée rien en double.
    */
   async #relayer(recoltes) {
-    const connus = DB.fusionner(this.evenementsLocaux, ...recoltes.map((r) => r.evts));
+    // Tout ce que CET appareil sait : son journal, ce qu'il a déjà reçu par le
+    // passé, et ce que les destinations viennent de lui donner. Le cache
+    // compte : c'est souvent lui qui détient l'histoire que la base a perdue.
+    const connus = DB.fusionner(
+      this.evenementsLocaux, this.evenementsDistants, ...recoltes.map((r) => r.evts));
     for (const { destination, evts } of recoltes) {
       if (destination.mode !== 'evenements') continue;
       const chezElle = new Set(evts.map((e) => e.id));
