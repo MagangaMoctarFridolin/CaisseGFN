@@ -318,6 +318,32 @@ retard, à venir). L'échéancier n'est pas stocké : il se recalcule à partir 
 montant, de la date d'octroi et du nombre de mensualités, puis se confronte à ce
 qui a réellement été remboursé. Corriger le prêt corrige l'échéancier.
 
+### Les intérêts
+
+Deux champs dans le formulaire du prêt : **Intérêts** et **Taux (%)**.
+
+- *Une fois, sur le capital* — 10 % sur 20 000 : l'emprunteur rend 22 000.
+- *Par mois, sur la durée convenue* — 5 % par mois sur quatre mensualités :
+  20 000 × 5 % × 4 = 4 000 d'intérêts, donc 24 000 à rendre.
+- *Sans intérêt* — le cas par défaut, celui de vos prêts actuels.
+
+C'est le **total dû** qui se découpe en mensualités, et c'est lui qui s'affiche
+en « reste dû ».
+
+Un point que je n'ai volontairement pas fait : **un retard n'augmente pas les
+intérêts tout seul.** Une somme qui gonfle pendant que personne ne regarde est
+une source de querelle, pas de justice. Si le bureau décide d'une pénalité, il
+la décide, et vous l'inscrivez en mouvement.
+
+Deux chiffres à ne pas confondre, et que l'application sépare :
+
+- **ce que doit l'adhérent** — capital et intérêts, c'est la colonne « reste dû » ;
+- **ce qui manque en caisse** — le capital sorti moins tout ce qui est rentré.
+  Les intérêts n'y comptent que lorsqu'ils sont réellement encaissés.
+
+C'est pour cela que le solde de la caisse ne monte pas le jour où vous accordez
+un prêt à 10 % : il monte le jour où l'argent revient.
+
 Le bouton **Rembourser** propose d'emblée le montant de la prochaine échéance
 due. Vous le modifiez si la personne a versé autre chose.
 
@@ -328,7 +354,53 @@ combien » : le total emprunté, le total remboursé, le reste dû, et le signal
 
 ---
 
-## 12. Le reçu de versement
+## 12. La clôture de l'exercice
+
+**Rapports → Clôture de l'exercice → Établir le partage.**
+
+C'est le document de la soirée de décembre. Il ne décide rien : il pose le
+calcul, ligne par ligne, avant que vous ne l'annonciez.
+
+**Deux règles de partage**, à choisir selon votre règlement :
+
+- *Apports rendus + part du résultat* — chacun récupère ce qu'il a versé dans
+  l'année, augmenté de sa part du bénéfice. La caisse repart à zéro. C'est le
+  partage le plus courant.
+- *Résultat seul* — les apports restent en caisse, on ne distribue que le
+  bénéfice.
+
+**Ce que le document pose :**
+
+1. *Le compte de l'exercice* — les apports, les intérêts encaissés sur les
+   prêts, les autres entrées, les charges. La différence est le **résultat à
+   partager**.
+2. *Ce qui n'entre pas dans le partage* — les sommes déjà remises au titre du
+   tour de rôle (elles sont déjà revenues à leurs bénéficiaires) et le capital
+   encore dehors en prêts non remboursés. **Cet argent n'est pas en caisse : il
+   ne peut pas être distribué.**
+3. *Ce que reçoit chacun* — ses apports, sa part du résultat au prorata de ces
+   apports, moins ce qu'il doit encore. On ne rend pas 50 000 à quelqu'un qui
+   en doit 30 000 pour les lui redemander le lendemain.
+4. *Le contrôle de caisse* — le seul chiffre qui empêche une soirée de mal
+   finir : le disponible en caisse, face au total annoncé aux adhérents. Si la
+   caisse ne couvre pas, l'application le dit en rouge et explique pourquoi,
+   le plus souvent parce que des prêts ne sont pas rentrés.
+5. *Les signatures du bureau.*
+
+Le document se recalcule à chaque ouverture. **Rien n'est figé tant que vous
+n'inscrivez pas les versements.**
+
+Le bouton **Inscrire les versements de partage**, en bas, crée une sortie de
+caisse par personne. À ne faire qu'**une fois l'argent réellement remis**.
+Ces écritures passent par le journal comme les autres : elles laissent une
+trace, et elles s'annulent depuis la Comptabilité si vous vous êtes trompé.
+
+Un adhérent qui doit plus qu'il ne reçoit apparaît en rouge, avec le montant
+qui lui reste à devoir.
+
+---
+
+## 13. Le reçu de versement
 
 Un adhérent qui verse par Airtel Money reçoit un SMS de l'opérateur, pas de la
 tontine. Le reçu comble ce trou.
@@ -345,7 +417,7 @@ tard porte exactement le même.
 
 ---
 
-## 13. Le journal des écritures
+## 14. Le journal des écritures
 
 **Onglet Journal.** Chaque saisie faite dans l'application y ajoute une ligne, et
 aucune ligne n'est jamais réécrite : corriger un montant n'efface pas l'ancien,
@@ -362,7 +434,7 @@ aussi : c'est le principe même de la transparence — ils ne peuvent rien y
 
 ---
 
-## 14. Partager la situation par WhatsApp
+## 15. Partager la situation par WhatsApp
 
 **Réglages → Créer le fichier de consultation.**
 
@@ -377,7 +449,7 @@ souvent et par eux-mêmes.
 
 ---
 
-## 15. Réseau faible ou absent
+## 16. Réseau faible ou absent
 
 Tout continue de fonctionner. Les saisies s'accumulent sur l'appareil et
 partent dès que la connexion revient. La pastille en haut à droite dit où
@@ -406,7 +478,7 @@ le retour du réseau, elle est toujours là à la réouverture.
 
 ---
 
-## 16. Sauvegardes
+## 17. Sauvegardes
 
 - `donnees/snapshot.json` dans OneDrive : photo lisible de toutes les données,
   réécrite à chaque synchronisation du PC.
@@ -418,7 +490,7 @@ le retour du réseau, elle est toujours là à la réouverture.
 
 ---
 
-## 17. Dépannage
+## 18. Dépannage
 
 | Situation | Que faire |
 |---|---|
@@ -442,7 +514,7 @@ le retour du réseau, elle est toujours là à la réouverture.
 
 ---
 
-## 18. Un écart hérité du classeur
+## 19. Un écart hérité du classeur
 
 La feuille *Statistiques* affichait un solde final de **400 000** alors que le
 total des cotisations est de **402 000** : les 2 000 FCFA de Geordi n'y

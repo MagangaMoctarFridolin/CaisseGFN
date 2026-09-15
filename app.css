@@ -171,6 +171,11 @@ table.tour td { vertical-align: middle; }
 /* prêts : échéancier et encours */
 table.echeancier td, table.encours td { vertical-align: middle; }
 
+/* clôture de l'exercice */
+table.partage td, table.cloture table td { vertical-align: top; }
+.cloture h1 { font-size: 1.35rem; }
+.cloture .avert, .cloture .mauvais { margin-bottom: 0; }
+
 /* reçu de versement */
 .recu table td { border-bottom: 1px dashed var(--trait); }
 .recu table { max-width: 32rem; }
