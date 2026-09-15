@@ -17,6 +17,10 @@ import { Synchro } from './synchro.js';
 import * as UI from './ui.js';
 import * as Comptes from './comptes.js';
 import * as Declarations from './declarations.js';
+import * as Historique from './historique.js';
+import * as Recu from './recu.js';
+import * as Tour from './tour.js';
+import * as Prets from './prets.js';
 import { CONFIG } from '../config.js';
 
 const { h, toast } = UI;
@@ -25,9 +29,11 @@ const ONGLETS = [
   { cle: 'tableau', nom: 'Tableau de bord', vue: UI.vueTableauBord },
   { cle: 'adherents', nom: 'Adhérents', vue: UI.vueAdherents },
   { cle: 'cotisations', nom: 'Cotisations', vue: UI.vueCotisations },
-  { cle: 'prets', nom: 'Prêts', vue: UI.vuePrets },
+  { cle: 'tour', nom: 'Tour de rôle', vue: Tour.vueTour },
+  { cle: 'prets', nom: 'Prêts', vue: Prets.vuePrets },
   { cle: 'comptabilite', nom: 'Comptabilité', vue: UI.vueComptabilite },
   { cle: 'rapports', nom: 'Rapports', vue: UI.vueRapports },
+  { cle: 'journal', nom: 'Journal', vue: Historique.vueHistorique },
   { cle: 'reglages', nom: 'Réglages', vue: UI.vueReglages }
 ];
 
@@ -89,6 +95,8 @@ function contexte() {
       try { await synchro.enregistrer(entite, type, donnees); }
       catch (e) { toast('Erreur : ' + e.message); }
     },
+    telechargerRecu(cotisation) { Recu.telechargerRecu(synchro.etat, cotisation, feuilleStyle); },
+    partagerRecu(cotisation) { return Recu.partagerRecu(synchro.etat, cotisation, feuilleStyle); },
     exporterConsultation() {
       const nom = `tontine-${(synchro.etat.association.nom || 'situation')
         .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${new Date().toISOString().slice(0, 10)}.html`;

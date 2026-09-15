@@ -23,6 +23,9 @@ export const ETAT_VIDE = () => ({
     telephone: '', email: '', airtelMoney: '',
     // Moyens de versement proposés aux adhérents — voir canaux() plus bas.
     canaux: [],
+    // Cotisation mensuelle de référence : ce que verse un adhérent qui n'a pas
+    // d'engagement particulier. Zéro signifie « pas de montant fixe ».
+    cotisationMensuelle: 0,
     anneeDemarrage: new Date().getFullYear(), devise: 'FCFA'
   },
   adherents: [], cotisations: [], prets: [], mouvements: [], comptes: []
@@ -121,6 +124,73 @@ export function encoursPret(pret) {
 export function enRetard(pret, aujourdhui = new Date()) {
   if (encoursPret(pret) <= 0 || !pret.dateLimite) return false;
   return new Date(pret.dateLimite) < aujourdhui;
+}
+
+export function totalRembourse(pret) {
+  return (pret.remboursements || []).reduce((s, r) => s + (+r.montant || 0), 0);
+}
+
+/**
+ * L'échéancier d'un prêt : les versements attendus, et ce qui les couvre.
+ *
+ * Il n'est pas stocké. On le déduit du montant, de la date d'octroi et du
+ * nombre de mensualités convenues — et on le confronte au cumul réellement
+ * remboursé. Un prêt sans mensualité convenue n'a pas d'échéancier : il a une
+ * date limite, et c'est tout. Inventer un calendrier que personne n'a promis
+ * ne rendrait service à personne.
+ */
+export function echeancier(pret, aujourdhui = new Date()) {
+  const n = Math.round(+pret.nbEcheances || 0);
+  if (n <= 0 || !pret.dateOctroi) return [];
+  const montant = +pret.montant || 0;
+  const part = Math.floor(montant / n);
+  const depart = new Date(pret.dateOctroi);
+  if (isNaN(depart)) return [];
+
+  let cumulPaye = totalRembourse(pret);
+  let cumulDu = 0;
+  const lignes = [];
+  for (let i = 1; i <= n; i++) {
+    // La dernière mensualité absorbe l'arrondi : la somme fait le montant.
+    const du = i === n ? montant - part * (n - 1) : part;
+    cumulDu += du;
+    const date = new Date(depart);
+    date.setMonth(date.getMonth() + i);
+    const couvert = Math.max(0, Math.min(du, cumulPaye - (cumulDu - du)));
+    const echue = date <= aujourdhui;
+    lignes.push({
+      rang: i, date: date.toISOString().slice(0, 10), montant: du, couvert,
+      etat: couvert >= du ? 'reglee' : echue ? 'en-retard' : 'a-venir'
+    });
+  }
+  return lignes;
+}
+
+/** L'encours de prêt par adhérent, du plus engagé au moins engagé. */
+export function encoursParAdherent(etat) {
+  const parQui = new Map();
+  for (const p of etat.prets || []) {
+    const encours = encoursPret(p);
+    const ligne = parQui.get(p.adherentId) || {
+      adherentId: p.adherentId,
+      adherent: etat.adherents.find((a) => a.id === p.adherentId) || null,
+      encours: 0, emprunte: 0, rembourse: 0, nombre: 0, enRetard: false
+    };
+    ligne.encours += encours;
+    ligne.emprunte += +p.montant || 0;
+    ligne.rembourse += totalRembourse(p);
+    ligne.nombre += 1;
+    if (enRetard(p)) ligne.enRetard = true;
+    parQui.set(p.adherentId, ligne);
+  }
+  return [...parQui.values()].sort((a, b) => b.encours - a.encours);
+}
+
+/** L'encours d'un adhérent donné — utile pour le signaler ailleurs. */
+export function encoursAdherent(etat, adherentId) {
+  return (etat.prets || [])
+    .filter((p) => p.adherentId === adherentId)
+    .reduce((s, p) => s + encoursPret(p), 0);
 }
 
 export function totalCotisationsAdherent(etat, adherentId, annee) {
@@ -267,6 +337,136 @@ export function parMoyen(etat, annee) {
     cumul.set(id, ligne);
   }
   return [...cumul.values()].sort((a, b) => b.montant - a.montant);
+}
+
+/* -------------------------------------------------------- tour de rôle --- */
+
+/**
+ * La tontine « à tour de rôle » : tout le monde verse, et la totalité du mois
+ * revient à une personne différente à chaque fois, jusqu'à ce que chacun ait
+ * reçu une fois. Elle coexiste ici avec la caisse d'épargne et de prêts : la
+ * même association pratique souvent les deux, et rien n'oblige à choisir.
+ *
+ * Le tour vit dans la fiche de l'association, comme les moyens de versement —
+ * donc dans le journal, sans table nouvelle ni migration à faire tourner sur
+ * une base déjà en service. Il tient en trois choses :
+ *
+ *   ordre  : les adhérents, dans l'ordre convenu ;
+ *   debut  : le mois du premier tour ;
+ *   recus  : ce qui a RÉELLEMENT été remis — le reste n'est qu'une prévision.
+ *
+ * Le calendrier n'est donc jamais stocké : il se déduit. Décaler le départ
+ * d'un mois décale tout le monde, sans rien réécrire.
+ */
+export function tour(etat) {
+  const t = etat?.association?.tour;
+  if (!t || !Array.isArray(t.ordre) || !t.ordre.length) return null;
+  if (t.actif === false) return null;
+  return { actif: true, ordre: t.ordre, debut: t.debut || null, recus: t.recus || [] };
+}
+
+function ajouterMois(annee, mois, n) {
+  const total = (annee * 12) + (mois - 1) + n;
+  return { annee: Math.floor(total / 12), mois: (total % 12) + 1 };
+}
+
+/** Ce qui est entré dans la caisse pour ce mois — c'est ce que reçoit le bénéficiaire. */
+export function cagnotteDuMois(etat, annee, mois) {
+  return (etat.cotisations || [])
+    .filter((c) => c.annee === annee && c.mois === mois)
+    .reduce((s, c) => s + (+c.montant || 0), 0);
+}
+
+/**
+ * Le calendrier complet du tour : un rang par adhérent inscrit.
+ * [{ rang, annee, mois, adherent, recu, cagnotte, etat }] où etat vaut
+ * 'recu' | 'a-remettre' | 'attendu'.
+ */
+export function calendrierTour(etat) {
+  const t = tour(etat);
+  if (!t) return [];
+  const debut = t.debut || { annee: new Date().getFullYear(), mois: 1 };
+  const maintenant = new Date();
+  const rangCourant = (maintenant.getFullYear() * 12) + maintenant.getMonth();
+
+  return t.ordre.map((adherentId, i) => {
+    const { annee, mois } = ajouterMois(debut.annee, debut.mois, i);
+    const recu = t.recus.find((r) => r.adherentId === adherentId
+      && r.annee === annee && r.mois === mois)
+      || t.recus.find((r) => r.adherentId === adherentId && r.rang === i);
+    const passe = (annee * 12) + (mois - 1) <= rangCourant;
+    return {
+      rang: i,
+      annee, mois,
+      adherent: etat.adherents.find((a) => a.id === adherentId) || null,
+      adherentId,
+      recu: recu || null,
+      cagnotte: cagnotteDuMois(etat, annee, mois),
+      etat: recu ? 'recu' : passe ? 'a-remettre' : 'attendu'
+    };
+  });
+}
+
+/** Le tour en cours ou le prochain à honorer. */
+export function prochainTour(etat) {
+  const cal = calendrierTour(etat);
+  return cal.find((l) => l.etat === 'a-remettre') || cal.find((l) => l.etat === 'attendu') || null;
+}
+
+/** Le tour qui tombe précisément sur ce mois-là, s'il y en a un. */
+export function tourDuMois(etat, annee, mois) {
+  return calendrierTour(etat).find((l) => l.annee === annee && l.mois === mois) || null;
+}
+
+/* ------------------------------------------------- cotisation attendue --- */
+
+/**
+ * Ce qu'un adhérent doit verser chaque mois.
+ *
+ * Dans cette tontine les engagements ne sont pas égaux : l'un met 2 000, un
+ * autre 50 000. Le montant vit donc sur la fiche de l'adhérent. Le montant de
+ * l'association ne sert que de valeur par défaut, pour ceux qui n'ont rien
+ * déclaré de particulier. Zéro partout = pas d'engagement fixe, et alors
+ * l'application ne réclame rien à personne : mieux vaut ne rien dire que
+ * réclamer à tort.
+ */
+export function attenduMensuel(etat, adherent) {
+  const propre = +adherent?.montantMensuel;
+  if (Number.isFinite(propre) && propre > 0) return propre;
+  const defaut = +etat?.association?.cotisationMensuelle;
+  return Number.isFinite(defaut) && defaut > 0 ? defaut : 0;
+}
+
+/** Y a-t-il au moins un engagement chiffré quelque part ? */
+export function aDesEngagements(etat) {
+  return (etat?.adherents || []).some((a) => attenduMensuel(etat, a) > 0);
+}
+
+/**
+ * L'état des versements d'un mois, adhérent par adhérent.
+ * Renvoie [{ adherent, attendu, verse, manque, statut }] où statut vaut
+ * 'paye' | 'partiel' | 'rien' | 'libre' (aucun montant attendu).
+ */
+export function suiviDuMois(etat, annee, mois) {
+  return (etat?.adherents || [])
+    .filter((a) => a.actif !== false)
+    .map((a) => {
+      const attendu = attenduMensuel(etat, a);
+      const verse = (etat.cotisations || [])
+        .filter((c) => c.adherentId === a.id && c.annee === annee && c.mois === mois)
+        .reduce((s, c) => s + (+c.montant || 0), 0);
+      const manque = Math.max(0, attendu - verse);
+      const statut = !attendu ? (verse > 0 ? 'paye' : 'libre')
+        : manque === 0 ? 'paye' : verse > 0 ? 'partiel' : 'rien';
+      return { adherent: a, attendu, verse, manque, statut };
+    })
+    .sort((x, y) => y.manque - x.manque
+      || (x.adherent.numero || '').localeCompare(y.adherent.numero || ''));
+}
+
+/** Ceux à relancer : il manque quelque chose, et on sait combien. */
+export function impayesDuMois(etat, annee, mois) {
+  return suiviDuMois(etat, annee, mois).filter((l) => l.manque > 0);
 }
 
 /* ------------------------------------------------------------------- formats */

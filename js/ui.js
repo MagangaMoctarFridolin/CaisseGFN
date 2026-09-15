@@ -3,6 +3,9 @@
    ========================================================================== */
 
 import * as DB from './db.js';
+import { blocImpayes } from './suivi.js';
+import { blocRecus } from './recu.js';
+import { bandeauTour } from './tour.js';
 
 const { fmtMontant, fmtNombre, fmtDate, nomComplet, MOIS_NOMS } = DB;
 
@@ -78,13 +81,19 @@ export function formulaire(titre, champs, surValider) {
 }
 
 /**
- * Demande une confirmation. Deux usages possibles :
- *   confirmer('Supprimer ?', () => …)            — à l'ancienne, par rappel
- *   if (await confirmer('Supprimer ?', 'détail')) — par promesse
+ * Demande une confirmation. Trois usages, tous acceptés :
+ *   confirmer('Supprimer ?', () => …)                     — par rappel
+ *   confirmer('Supprimer ?', 'ce que cela implique', fn)  — avec explication
+ *   if (await confirmer('Supprimer ?', 'détail')) …       — par promesse
+ *
+ * L'ordre des deux derniers arguments n'a pas d'importance : on reconnaît le
+ * rappel à ce qu'il est une fonction. C'est ce qui manquait : un appel de la
+ * forme (message, explication, rappel) perdait silencieusement son rappel, et
+ * le bouton « Retirer » des moyens de versement ne retirait rien.
  */
-export function confirmer(message, surOuiOuDetail, detail) {
-  const surOui = typeof surOuiOuDetail === 'function' ? surOuiOuDetail : null;
-  const explication = typeof surOuiOuDetail === 'string' ? surOuiOuDetail : detail;
+export function confirmer(message, a, b) {
+  const surOui = typeof a === 'function' ? a : typeof b === 'function' ? b : null;
+  const explication = typeof a === 'string' ? a : typeof b === 'string' ? b : null;
   return new Promise((resolve) => {
     let repondu = false;
     const finir = (oui) => {
@@ -131,6 +140,10 @@ export function vueTableauBord(ctx) {
         : stat('Adhérents actifs', t.nbAdherents)),
 
     bandeauMoyens(etat),
+
+    bandeauTour(ctx),
+
+    blocImpayes(ctx),
 
     ctx.blocDeclarations ? ctx.blocDeclarations(ctx) : null,
 
@@ -231,6 +244,8 @@ export function vueAdherents(ctx) {
     { cle: 'nom', libelle: 'Nom' },
     { cle: 'telephone', libelle: 'Téléphone' },
     { cle: 'email', libelle: 'E-mail', type: 'email' },
+    { cle: 'montantMensuel', libelle: 'Cotisation mensuelle (' + dev + ')', type: 'number',
+      valeur: etat.association.cotisationMensuelle || null },
     { cle: 'dateAdhesion', libelle: "Date d'adhésion", type: 'date', valeur: new Date().toISOString().slice(0, 10) },
     { cle: 'remarques', libelle: 'Remarques', type: 'textarea', large: true }
   ], (v) => ctx.enregistrer('adherent', 'upsert', { id: DB.uid('adh'), actif: true, ...v }));
@@ -241,6 +256,8 @@ export function vueAdherents(ctx) {
     { cle: 'nom', libelle: 'Nom', valeur: a.nom },
     { cle: 'telephone', libelle: 'Téléphone', valeur: a.telephone },
     { cle: 'email', libelle: 'E-mail', type: 'email', valeur: a.email },
+    { cle: 'montantMensuel', libelle: 'Cotisation mensuelle (' + dev + ')', type: 'number',
+      valeur: a.montantMensuel ?? null },
     { cle: 'dateAdhesion', libelle: "Date d'adhésion", type: 'date', valeur: a.dateAdhesion },
     { cle: 'actif', libelle: 'Statut', type: 'select', valeur: a.actif === false ? 'non' : 'oui',
       options: [{ valeur: 'oui', libelle: 'Actif' }, { valeur: 'non', libelle: 'Inactif' }] },
@@ -260,7 +277,8 @@ export function vueAdherents(ctx) {
       : h('div', { class: 'carte' }, h('div', { class: 'defilable' }, h('table', {},
           h('thead', {}, h('tr', {},
             h('th', {}, 'N°'), h('th', {}, 'Adhérent'), h('th', {}, 'Contact'),
-            h('th', {}, 'Adhésion'), h('th', { class: 'num' }, 'Cumul apports'),
+            h('th', {}, 'Adhésion'), h('th', { class: 'num' }, 'Attendu / mois'),
+            h('th', { class: 'num' }, 'Cumul apports'),
             ctx.peutEcrire ? h('th', {}, '') : null)),
           h('tbody', {}, [...etat.adherents]
             .sort((a, b) => (a.numero || '').localeCompare(b.numero || ''))
@@ -268,14 +286,28 @@ export function vueAdherents(ctx) {
               h('td', {}, a.numero),
               h('td', {}, nomComplet(a), ' ',
                 a.fonction ? h('span', { class: 'etiquette' }, DB.nomFonction(a.fonction)) : null,
-                a.actif === false ? h('span', { class: 'etiquette attente' }, 'inactif') : null),
+                a.actif === false ? h('span', { class: 'etiquette attente' }, 'inactif') : null,
+                DB.encoursAdherent(etat, a.id)
+                  ? h('span', { class: 'etiquette attente', style: 'margin-left:.3rem',
+                      title: 'Prêt non soldé' },
+                      'doit ' + fmtNombre(DB.encoursAdherent(etat, a.id)))
+                  : null),
               h('td', { class: 'doux' }, [a.telephone, a.email].filter(Boolean).join(' · ') || '—'),
               h('td', { class: 'doux' }, fmtDate(a.dateAdhesion)),
+              h('td', { class: 'num doux' }, DB.attenduMensuel(etat, a)
+                ? fmtNombre(DB.attenduMensuel(etat, a))
+                  + (a.montantMensuel ? '' : ' *')
+                : '—'),
               h('td', { class: 'num' }, fmtMontant(DB.totalCotisationsAdherent(etat, a.id), dev)),
               ctx.peutEcrire ? h('td', { style: 'white-space:nowrap;text-align:right' },
                 h('button', { onClick: () => modifier(a) }, 'Modifier'),
                 ' ',
-                h('button', { class: 'danger', onClick: () => supprimer(a) }, '✕')) : null)))))));
+                h('button', { class: 'danger', onClick: () => supprimer(a) }, '✕')) : null))))),
+          DB.aDesEngagements(etat)
+            ? h('p', { class: 'doux', style: 'margin:.6rem 0 0' },
+                'La colonne « attendu / mois » sert au suivi des relances. Un astérisque signale un montant repris du réglage de l’association, faute d’engagement propre à l’adhérent.')
+            : h('p', { class: 'doux', style: 'margin:.6rem 0 0' },
+                'Renseignez la cotisation mensuelle de chacun : le tableau de bord pourra alors dire qui n’a pas encore versé.')));
 }
 
 export function prochainNumero(etat) {
@@ -439,68 +471,6 @@ export function vueCotisations(ctx) {
               totauxMois.map((t) => h('td', { class: 'num' }, t ? fmtNombre(t) : '—')),
               h('td', { class: 'num' }, fmtNombre(totauxMois.reduce((s, x) => s + x, 0))))))),
           legendeMoyens(etat)));
-}
-
-/* ==================================================================== prêts === */
-
-export function vuePrets(ctx) {
-  const { etat } = ctx;
-  const dev = etat.association.devise;
-  const optionsAdherents = etat.adherents.map((a) => ({ valeur: a.id, libelle: nomComplet(a) }));
-
-  const nouveau = () => {
-    if (!optionsAdherents.length) return toast('Ajoutez d’abord un adhérent.');
-    formulaire('Nouveau prêt', [
-      { cle: 'adherentId', libelle: 'Adhérent', type: 'select', options: optionsAdherents },
-      { cle: 'montant', libelle: 'Montant (' + dev + ')', type: 'number', requis: true },
-      { cle: 'dateOctroi', libelle: "Date d'octroi", type: 'date', valeur: new Date().toISOString().slice(0, 10) },
-      { cle: 'dateLimite', libelle: 'Date limite de remboursement', type: 'date' },
-      { cle: 'objet', libelle: 'Objet', large: true }
-    ], (v) => ctx.enregistrer('pret', 'upsert', { id: DB.uid('pret'), remboursements: [], ...v }));
-  };
-
-  const rembourser = (p) => formulaire('Remboursement', [
-    { cle: 'montant', libelle: 'Montant reçu (' + dev + ')', type: 'number', requis: true,
-      valeur: DB.encoursPret(p) },
-    { cle: 'date', libelle: 'Date', type: 'date', valeur: new Date().toISOString().slice(0, 10) }
-  ], (v) => ctx.enregistrer('pret', 'upsert', {
-    ...p, remboursements: [...(p.remboursements || []), { id: DB.uid('remb'), ...v }]
-  }));
-
-  const supprimer = (p) => confirmer('Supprimer ce prêt et son historique de remboursement ?',
-    () => ctx.enregistrer('pret', 'delete', { id: p.id }));
-
-  const prets = [...etat.prets].sort((a, b) => (b.dateOctroi || '').localeCompare(a.dateOctroi || ''));
-
-  return h('div', {},
-    h('div', { class: 'barre' },
-      h('h1', {}, 'Prêts'),
-      ctx.peutEcrire ? h('button', { class: 'primaire pousse', onClick: nouveau }, '+ Nouveau prêt') : null),
-    prets.length === 0
-      ? h('div', { class: 'carte' }, h('p', { class: 'vide' }, 'Aucun prêt en cours.'))
-      : h('div', { class: 'carte' }, h('div', { class: 'defilable' }, h('table', {},
-          h('thead', {}, h('tr', {},
-            h('th', {}, 'Adhérent'), h('th', { class: 'num' }, 'Montant'),
-            h('th', { class: 'num' }, 'Remboursé'), h('th', { class: 'num' }, 'Reste dû'),
-            h('th', {}, 'Échéance'), h('th', {}, 'État'), ctx.peutEcrire ? h('th', {}, '') : null)),
-          h('tbody', {}, prets.map((p) => {
-            const a = etat.adherents.find((x) => x.id === p.adherentId);
-            const rembourse = (p.remboursements || []).reduce((s, r) => s + (+r.montant || 0), 0);
-            const reste = DB.encoursPret(p);
-            const retard = DB.enRetard(p);
-            return h('tr', {},
-              h('td', {}, nomComplet(a), p.objet ? h('div', { class: 'doux' }, p.objet) : null),
-              h('td', { class: 'num' }, fmtNombre(p.montant)),
-              h('td', { class: 'num' }, fmtNombre(rembourse)),
-              h('td', { class: 'num', style: reste ? 'font-weight:650' : '' }, reste ? fmtNombre(reste) : '—'),
-              h('td', { class: 'doux' }, fmtDate(p.dateLimite)),
-              h('td', {}, reste === 0
-                ? h('span', { class: 'etiquette' }, 'soldé')
-                : h('span', { class: 'etiquette ' + (retard ? 'retard' : 'attente') }, retard ? 'en retard' : 'en cours')),
-              ctx.peutEcrire ? h('td', { style: 'white-space:nowrap;text-align:right' },
-                reste > 0 ? h('button', { onClick: () => rembourser(p) }, 'Rembourser') : null,
-                ' ', h('button', { class: 'danger', onClick: () => supprimer(p) }, '✕')) : null);
-          }))))));
 }
 
 /* ============================================================ comptabilité === */
@@ -688,9 +658,10 @@ export function vueRapports(ctx) {
         h('button', { onClick: () => exporterCSV(etat, annee) }, 'Exporter pour Excel (CSV)'),
         h('button', { onClick: () => exporterJSON(etat) }, 'Sauvegarde complète (JSON)')),
       h('h3', { style: 'margin-top:1rem' }, 'Fiche individuelle'),
-      h('div', { class: 'barre' }, etat.adherents.length
+      h('div', { class: 'barre choix-fiche' }, etat.adherents.length
         ? etat.adherents.map((a) => h('button', { onClick: () => fiche(a) }, nomComplet(a)))
         : h('span', { class: 'doux' }, 'Aucun adhérent.'))),
+    h('div', { class: 'carte' }, blocRecus(ctx, zone)),
     zone);
 }
 
@@ -910,7 +881,9 @@ export function vueReglages(ctx) {
     { cle: 'adresse', libelle: 'Adresse du siège', valeur: assoc.adresse },
     { cle: 'telephone', libelle: 'Téléphone', valeur: assoc.telephone },
     { cle: 'email', libelle: 'E-mail', valeur: assoc.email },
-    { cle: 'devise', libelle: 'Devise', valeur: assoc.devise }
+    { cle: 'devise', libelle: 'Devise', valeur: assoc.devise },
+    { cle: 'cotisationMensuelle', libelle: 'Cotisation mensuelle de référence',
+      type: 'number', valeur: assoc.cotisationMensuelle || null }
   ], (v) => ctx.enregistrer('association', 'upsert', { ...assoc, ...v }));
 
   const bloc = (titre, ...contenu) => h('div', { class: 'carte' }, h('h2', {}, titre), ...contenu);
@@ -992,6 +965,9 @@ export function vueReglages(ctx) {
       h('table', {}, h('tbody', {},
         [['Nom', assoc.nom], ['Siège', assoc.adresse], ['Téléphone', assoc.telephone || '—'],
          ['E-mail', assoc.email || '—'],
+         ['Cotisation mensuelle de référence', assoc.cotisationMensuelle
+           ? fmtMontant(assoc.cotisationMensuelle, assoc.devise)
+           : 'aucune — chaque fiche porte son propre montant'],
          ['Devise', assoc.devise]].map(([k, v]) =>
           h('tr', {}, h('td', { class: 'doux' }, k), h('td', {}, v))))),
       admin ? h('div', { class: 'barre', style: 'margin-top:.8rem' },
