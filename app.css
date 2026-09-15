@@ -151,6 +151,30 @@ td.num .repere { position: static; transform: none; margin-left: .35rem; cursor:
 .choix-moyen { display: inline-flex; align-items: center; gap: .35rem; }
 .choix-moyen select { width: auto; }
 
+/* jauge d'avancement des cotisations du mois */
+.jauge { background: var(--trait); border-radius: 999px; height: 10px; overflow: hidden; margin: .1rem 0 .3rem; }
+.jauge-plein { height: 100%; background: var(--accent); border-radius: 999px; transition: width .3s; }
+
+/* qui n'a pas payé */
+table.impayes td { vertical-align: middle; }
+table.impayes .bouton { font-size: .8rem; padding: .3rem .6rem; }
+
+/* journal des écritures */
+table.journal td { vertical-align: top; }
+table.journal tbody tr:hover { background: var(--accent-clair); }
+table.journal .etiquette { vertical-align: baseline; }
+
+/* tour de rôle */
+table.tour tr.a-remettre td { background: var(--ambre-clair); }
+table.tour td { vertical-align: middle; }
+
+/* prêts : échéancier et encours */
+table.echeancier td, table.encours td { vertical-align: middle; }
+
+/* reçu de versement */
+.recu table td { border-bottom: 1px dashed var(--trait); }
+.recu table { max-width: 32rem; }
+
 /* fenêtre modale */
 dialog {
   border: 0; border-radius: var(--rayon); padding: 0; background: var(--carte); color: var(--texte);

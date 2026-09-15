@@ -244,7 +244,125 @@ rapprochez du relevé, vous validez.
 
 ---
 
-## 9. Partager la situation par WhatsApp
+## 9. Qui n'a pas payé ce mois
+
+C'est la question qu'on se pose le 25 du mois. Pour que l'application sache y
+répondre, il lui faut une chose qu'elle n'avait pas : **ce que chacun s'est
+engagé à verser.**
+
+Deux endroits, selon les cas :
+
+- **Adhérents → Modifier → Cotisation mensuelle** : le montant propre à cette
+  personne. C'est ce qu'il faut renseigner ici, où les engagements vont de
+  2 000 à 50 000 FCFA.
+- **Réglages → Association → Cotisation mensuelle de référence** : le montant
+  qui s'applique à ceux qui n'ont rien de particulier. Un astérisque dans la
+  colonne « attendu / mois » signale que le montant vient de là.
+
+Tant que personne n'a d'engagement chiffré, l'application se tait : elle ne
+réclame rien à personne. Dès qu'un montant existe, le **tableau de bord**
+affiche la carte « Cotisations du mois » :
+
+- la jauge : ce qui est rentré sur ce qui est attendu ;
+- la liste de ceux à relancer, avec ce qui manque à chacun ;
+- un bouton **Relancer** par personne. Il ouvre WhatsApp sur sa conversation,
+  message déjà écrit : son nom, le mois, le montant manquant, et par où verser.
+  Vous relisez, vous envoyez. Rien ne part sans vous.
+- **Copier le récapitulatif pour le groupe** : la même chose en une liste, à
+  coller dans le groupe WhatsApp de la famille.
+
+Sans numéro de téléphone sur la fiche, le bouton devient « Copier le message » :
+l'application n'ouvre pas une conversation avec un numéro qu'elle n'a pas.
+
+Le sélecteur de mois, en haut de la carte, permet de revenir sur un mois passé.
+
+---
+
+## 10. Le tour de rôle
+
+L'autre façon de faire tourner une tontine : tout le monde verse, et la totalité
+du mois revient à une seule personne, différente à chaque tour, jusqu'à ce que
+chacun ait reçu une fois.
+
+Les deux régimes coexistent dans l'application. La caisse d'épargne et de prêts
+continue de fonctionner comme avant ; le tour s'y ajoute.
+
+**Onglet Tour de rôle → Mettre en place le tour de rôle.** Deux choses à dire :
+l'ordre convenu entre vous, et le mois du premier tour. Le calendrier se
+déduit — un mois par personne, dans l'ordre. Les flèches ↑ ↓ ajustent l'ordre,
+et « Changer le mois de départ » décale tout le monde d'un coup.
+
+Quand vous remettez la somme à celui dont c'est le tour : **Remettre**. Vous
+indiquez la somme réellement remise et la date. L'application inscrit alors
+**deux choses** : la remise dans le calendrier, et une sortie de caisse au
+débit. Sans cette seconde écriture, le solde affiché mentirait dès le premier
+tour.
+
+La colonne « Somme » se lit ainsi : en gris, ce qui a été versé ce mois-là,
+c'est-à-dire la prévision ; en noir, ce qui a réellement été remis.
+
+**Annuler** retire les deux écritures. Rien n'est perdu pour autant : le journal
+en garde la trace, comme de tout le reste.
+
+---
+
+## 11. Les prêts : échéancier et engagement
+
+Dans le formulaire d'un prêt, un champ compte plus que les autres : **le nombre
+de mensualités**. Laissez 0 si le prêt se rembourse en une fois — l'application
+s'en tiendra alors à la date limite.
+
+Avec un nombre de mensualités, le bouton **Échéancier** ouvre le détail :
+chaque versement attendu, sa date, ce qui le couvre, et son état (réglée, en
+retard, à venir). L'échéancier n'est pas stocké : il se recalcule à partir du
+montant, de la date d'octroi et du nombre de mensualités, puis se confronte à ce
+qui a réellement été remboursé. Corriger le prêt corrige l'échéancier.
+
+Le bouton **Rembourser** propose d'emblée le montant de la prochaine échéance
+due. Vous le modifiez si la personne a versé autre chose.
+
+En bas de l'écran, **Engagement par adhérent** répond à la question « qui doit
+combien » : le total emprunté, le total remboursé, le reste dû, et le signal
+« en retard » le cas échéant. Dans la liste des adhérents, une étiquette
+« doit … » rappelle ce que chacun a encore sur le dos.
+
+---
+
+## 12. Le reçu de versement
+
+Un adhérent qui verse par Airtel Money reçoit un SMS de l'opérateur, pas de la
+tontine. Le reçu comble ce trou.
+
+**Rapports → Reçu de versement → le nom de l'adhérent.** Ses versements de
+l'année s'affichent ; pour chacun, trois boutons : **Afficher** (à l'écran, puis
+Imprimer / PDF), **Télécharger** (une page HTML autonome) et **Partager…** (qui
+ouvre WhatsApp sur téléphone).
+
+Le numéro du reçu — par exemple `2026-GFN003-09` — désigne l'adhérent et le
+mois, pas un compteur. Deux appareils qui éditent le reçu du même versement
+écrivent donc le même numéro, même sans réseau, et un reçu réédité six mois plus
+tard porte exactement le même.
+
+---
+
+## 13. Le journal des écritures
+
+**Onglet Journal.** Chaque saisie faite dans l'application y ajoute une ligne, et
+aucune ligne n'est jamais réécrite : corriger un montant n'efface pas l'ancien,
+cela ajoute une correction au-dessus.
+
+On y lit qui a inscrit quoi, quand, et depuis quel appareil. Les filtres —
+période, type d'écriture, recherche par nom — servent à retrouver une écriture
+précise. **Exporter le journal (CSV)** en sort une copie pour Excel.
+
+C'est la mémoire de la caisse, celle qu'on ouvre le jour où deux personnes ne se
+souviennent pas de la même chose. Les adhérents en consultation y ont accès
+aussi : c'est le principe même de la transparence — ils ne peuvent rien y
+écrire, mais ils peuvent tout y lire.
+
+---
+
+## 14. Partager la situation par WhatsApp
 
 **Réglages → Créer le fichier de consultation.**
 
@@ -259,7 +377,7 @@ souvent et par eux-mêmes.
 
 ---
 
-## 10. Réseau faible ou absent
+## 15. Réseau faible ou absent
 
 Tout continue de fonctionner. Les saisies s'accumulent sur l'appareil et
 partent dès que la connexion revient. La pastille en haut à droite dit où
@@ -288,7 +406,7 @@ le retour du réseau, elle est toujours là à la réouverture.
 
 ---
 
-## 11. Sauvegardes
+## 16. Sauvegardes
 
 - `donnees/snapshot.json` dans OneDrive : photo lisible de toutes les données,
   réécrite à chaque synchronisation du PC.
@@ -300,7 +418,7 @@ le retour du réseau, elle est toujours là à la réouverture.
 
 ---
 
-## 12. Dépannage
+## 17. Dépannage
 
 | Situation | Que faire |
 |---|---|
@@ -324,7 +442,7 @@ le retour du réseau, elle est toujours là à la réouverture.
 
 ---
 
-## 13. Un écart hérité du classeur
+## 18. Un écart hérité du classeur
 
 La feuille *Statistiques* affichait un solde final de **400 000** alors que le
 total des cotisations est de **402 000** : les 2 000 FCFA de Geordi n'y
