@@ -187,8 +187,8 @@ Airtel.
 
 Dès qu'un montant est inscrit, une **petite pastille de couleur** apparaît dans
 le coin de la case : verte pour Airtel Money, bleue pour les espèces, un cercle
-vide quand le moyen n'est pas connu (c'est le cas des données reprises du
-classeur de 2023). La légende sous le tableau rappelle les couleurs.
+vide quand le moyen n'est pas connu. La légende sous le tableau rappelle les
+couleurs.
 
 Un clic sur cette pastille ouvre le **détail du versement** — montant, moyen,
 référence de la transaction, date. C'est là qu'on note qu'untel a payé en
@@ -486,7 +486,8 @@ le retour du réseau, elle est toujours là à la réouverture.
   jamais.**
 - **Réglages → Télécharger une sauvegarde** : un fichier JSON complet.
 - Supabase conserve de son côté l'intégralité du journal.
-- Le classeur Excel d'origine n'est pas touché : il reste votre archive 2023.
+- Le classeur Excel d'origine n'est pas touché : il reste l'archive des exercices
+  antérieurs, que l'application ne reprend pas (voir la section 19).
 
 ---
 
@@ -505,7 +506,7 @@ le retour du réseau, elle est toujours là à la réouverture.
 | Le PC affiche « Base en ligne à jour » sans OneDrive | Réglages → Relier le dossier OneDrive |
 | Un adhérent ne peut pas saisir | C'est voulu : la saisie est réservée aux administrateurs |
 | Un adhérent ne voit pas les Réglages complets | C'est voulu : la gestion des comptes est réservée aux administrateurs |
-| Une cotisation n'a pas de moyen (cercle vide) | Normal pour les données reprises du classeur ; cliquez sur la pastille pour le renseigner |
+| Une cotisation n'a pas de moyen (cercle vide) | Le moyen n'a pas été précisé à la saisie ; cliquez sur la pastille pour le renseigner |
 | Le mauvais moyen a été enregistré | Cliquez sur la pastille de la case et corrigez-le dans le détail |
 | Une déclaration n'apparaît pas chez le trésorier | Elle a été retirée par son auteur, ou le tableau de bord n'a pas encore été rouvert |
 | L'adhérent n'a pas le bouton « Déclarer » | Son compte n'est pas encore approuvé, ou l'application tourne sans base en ligne |
@@ -514,10 +515,24 @@ le retour du réseau, elle est toujours là à la réouverture.
 
 ---
 
-## 19. Un écart hérité du classeur
+## 19. Et l'historique des années passées ?
 
-La feuille *Statistiques* affichait un solde final de **400 000** alors que le
-total des cotisations est de **402 000** : les 2 000 FCFA de Geordi n'y
-étaient pas repris. L'application part des cotisations réelles et affiche
-**402 000**. Si le solde réel de la caisse diffère, inscrivez l'écart dans
-l'onglet Comptabilité.
+**Décision prise : il n'est pas repris dans l'application.**
+
+Le classeur Excel reste l'archive des exercices antérieurs. Il ne bouge plus,
+il ne risque rien, et il répond à qui voudra savoir ce qui s'est passé avant.
+
+Ce que cela veut dire concrètement :
+
+- l'application part de l'exercice en cours, à zéro ;
+- le « cumul des apports » d'un adhérent ne compte que ce qui a été saisi ici ;
+- la clôture ne porte que sur les exercices suivis dans l'application.
+
+Si le solde réel de la caisse ne part pas de zéro — parce qu'il reste de
+l'argent des années précédentes — inscrivez-le **une fois** en Comptabilité :
+*+ Mouvement*, nature *Autre*, en crédit, objet « Report des exercices
+antérieurs ». Le solde affiché correspondra alors à la caisse réelle, sans
+qu'il ait fallu réécrire trois ans d'histoire.
+
+Le fichier de reprise reste dans le dossier `donnees/journal/` : rien ne
+presse, et rien n'empêche de l'importer plus tard si vous changez d'avis.
