@@ -171,6 +171,11 @@ table.tour td { vertical-align: middle; }
 /* prêts : échéancier et encours */
 table.echeancier td, table.encours td { vertical-align: middle; }
 
+/* caisses de projet */
+.carte.projet.clos { opacity: .72; }
+table.participants td, table.relances-projet td { vertical-align: middle; }
+table.relances-projet .bouton { font-size: .8rem; padding: .3rem .6rem; }
+
 /* clôture de l'exercice */
 table.partage td, table.cloture table td { vertical-align: top; }
 .cloture h1 { font-size: 1.35rem; }

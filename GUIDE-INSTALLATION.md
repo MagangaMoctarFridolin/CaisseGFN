@@ -400,7 +400,77 @@ qui lui reste à devoir.
 
 ---
 
-## 13. Le reçu de versement
+## 13. Les caisses de projet
+
+**Onglet Projets.**
+
+Une caisse de projet est une cagnotte à part : une somme réunie pour une chose
+précise — une toiture, un deuil, une fête, un matériel. Elle a ses propres
+contributions, ses propres dépenses et son propre solde.
+
+**La règle qui gouverne tout le reste : une écriture appartient à une seule
+caisse.** Ce qui entre dans un projet n'entre pas dans la caisse familiale, et
+réciproquement. Le solde de l'une n'apparaît jamais dans celui de l'autre, ni
+dans la comptabilité générale, ni dans la clôture de l'exercice.
+
+### Trois natures, à choisir à la création
+
+- **Objectif à atteindre** — une somme visée. L'écran affiche une jauge, ce qui
+  est collecté, ce qui est dépensé, et ce qui reste à trouver.
+- **Seconde tontine** — une mensualité par participant, avec la liste de ceux
+  qui n'ont pas encore versé ce mois-ci et un bouton pour les relancer sur
+  WhatsApp.
+- **Caisse libre** — ni objectif ni mensualité : on met, on retire, on garde le
+  compte.
+
+La nature se change après coup, dans *Modifier*.
+
+### Les participants
+
+Vous les prenez dans la liste de vos adhérents : un participant à un projet est
+toujours quelqu'un qui est déjà inscrit dans l'application. *Inscrire un
+participant* les ajoute un par un ; le ✕ les retire du projet sans effacer ce
+qu'ils ont déjà versé.
+
+### Qui voit quoi
+
+Deux réglages, par projet :
+
+- **Réservé aux participants** — les autres comptes ne voient pas ce projet
+  dans l'application.
+- **Ouvert à tous les comptes** — tous les adhérents connectés le voient, en
+  consultation.
+
+Dans les deux cas, **seuls les administrateurs écrivent**.
+
+Un point sur lequel il vaut mieux être franc que rassurant : « réservé aux
+participants » cache le projet à l'**écran** des autres. Ce n'est pas un
+coffre-fort. Les écritures voyagent dans le même journal partagé que tout le
+reste, et un adhérent qui sait ouvrir ce journal peut y lire les lignes. Pour
+une cagnotte de toiture, c'est sans conséquence. Pour une somme vraiment
+sensible, tenez-la ailleurs — ou demandez-moi la version où le serveur lui-même
+refuse la lecture, qui demande une modification de la base.
+
+### L'argent
+
+- **+ Contribution** — un participant verse. Vous indiquez le montant, la date,
+  le moyen et la référence Airtel le cas échéant.
+- **+ Dépense** — la caisse paie quelque chose. Si le montant dépasse le solde
+  du projet, l'application vous prévient avant d'inscrire : la caisse passerait
+  en négatif, ce qui n'a de sens que si quelqu'un a avancé l'argent.
+
+Le tableau des écritures tient le solde ligne à ligne, comme un cahier.
+
+### Clôturer plutôt que supprimer
+
+**Clôturer** marque la caisse comme close : elle reste consultable, elle n'est
+plus modifiable, et rien n'est perdu. **Supprimer** ne devrait servir que pour
+une caisse créée par erreur : ses écritures perdraient leur rattachement et
+retomberaient dans la comptabilité générale.
+
+---
+
+## 14. Le reçu de versement
 
 Un adhérent qui verse par Airtel Money reçoit un SMS de l'opérateur, pas de la
 tontine. Le reçu comble ce trou.
@@ -417,7 +487,7 @@ tard porte exactement le même.
 
 ---
 
-## 14. Le journal des écritures
+## 15. Le journal des écritures
 
 **Onglet Journal.** Chaque saisie faite dans l'application y ajoute une ligne, et
 aucune ligne n'est jamais réécrite : corriger un montant n'efface pas l'ancien,
@@ -434,7 +504,7 @@ aussi : c'est le principe même de la transparence — ils ne peuvent rien y
 
 ---
 
-## 15. Partager la situation par WhatsApp
+## 16. Partager la situation par WhatsApp
 
 **Réglages → Créer le fichier de consultation.**
 
@@ -449,7 +519,7 @@ souvent et par eux-mêmes.
 
 ---
 
-## 16. Réseau faible ou absent
+## 17. Réseau faible ou absent
 
 Tout continue de fonctionner. Les saisies s'accumulent sur l'appareil et
 partent dès que la connexion revient. La pastille en haut à droite dit où
@@ -478,7 +548,7 @@ le retour du réseau, elle est toujours là à la réouverture.
 
 ---
 
-## 17. Sauvegardes
+## 18. Sauvegardes
 
 - `donnees/snapshot.json` dans OneDrive : photo lisible de toutes les données,
   réécrite à chaque synchronisation du PC.
@@ -487,11 +557,11 @@ le retour du réseau, elle est toujours là à la réouverture.
 - **Réglages → Télécharger une sauvegarde** : un fichier JSON complet.
 - Supabase conserve de son côté l'intégralité du journal.
 - Le classeur Excel d'origine n'est pas touché : il reste l'archive des exercices
-  antérieurs, que l'application ne reprend pas (voir la section 19).
+  antérieurs, que l'application ne reprend pas (voir la section 20).
 
 ---
 
-## 18. Dépannage
+## 19. Dépannage
 
 | Situation | Que faire |
 |---|---|
@@ -515,7 +585,7 @@ le retour du réseau, elle est toujours là à la réouverture.
 
 ---
 
-## 19. Et l'historique des années passées ?
+## 20. Et l'historique des années passées ?
 
 **Décision prise : il n'est pas repris dans l'application.**
 
