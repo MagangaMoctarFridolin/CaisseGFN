@@ -116,9 +116,98 @@ export function rejouer(evenements, etatInitial) {
 
 /* -------------------------------------------------------------------- calculs */
 
+/**
+ * Les intérêts. Deux façons de compter, parce que les deux se pratiquent :
+ *
+ *   • « une fois, sur le capital »  — on rend 11 000 pour 10 000 ;
+ *   • « par mois »                  — tant pour cent, multiplié par la durée
+ *                                     CONVENUE (les mensualités prévues, ou
+ *                                     l'écart entre l'octroi et la date limite).
+ *
+ * Volontairement, un retard n'augmente pas les intérêts tout seul. Une somme
+ * qui gonfle d'elle-même pendant qu'on ne regarde pas est une source de
+ * querelle, pas de justice : si le bureau décide d'une pénalité, il la décide,
+ * et elle s'inscrit. L'application ne la décide pas à sa place.
+ */
+export const MODES_INTERET = [
+  { cle: '', nom: 'Sans intérêt' },
+  { cle: 'global', nom: 'Une fois, sur le capital' },
+  { cle: 'mensuel', nom: 'Par mois, sur la durée convenue' }
+];
+
+export function nomModeInteret(cle) {
+  return MODES_INTERET.find((m) => m.cle === (cle || ''))?.nom || 'Sans intérêt';
+}
+
+/** La durée convenue, en mois. Zéro si rien n'a été convenu. */
+export function dureeMois(pret) {
+  const n = Math.round(+pret?.nbEcheances || 0);
+  if (n > 0) return n;
+  if (pret?.dateOctroi && pret?.dateLimite) {
+    const debut = new Date(pret.dateOctroi);
+    const fin = new Date(pret.dateLimite);
+    if (!isNaN(debut) && !isNaN(fin) && fin > debut) {
+      return Math.max(1, Math.round((fin - debut) / 2629800000));
+    }
+  }
+  return 0;
+}
+
+export function interetsPret(pret) {
+  const taux = +pret?.tauxInteret || 0;
+  const mode = pret?.modeInteret || '';
+  const capital = +pret?.montant || 0;
+  if (taux <= 0 || !mode || capital <= 0) return 0;
+  if (mode === 'global') return Math.round(capital * taux / 100);
+  const mois = dureeMois(pret);
+  if (!mois) return 0;   // par mois, mais aucune durée convenue : on ne devine pas
+  return Math.round(capital * taux / 100 * mois);
+}
+
+/** Ce que l'emprunteur doit en tout : capital et intérêts. */
+export function duTotalPret(pret) {
+  return (+pret?.montant || 0) + interetsPret(pret);
+}
+
+/** Ce qu'il lui reste à rendre. */
 export function encoursPret(pret) {
-  const rembourse = (pret.remboursements || []).reduce((s, r) => s + (+r.montant || 0), 0);
-  return Math.max(0, (+pret.montant || 0) - rembourse);
+  return Math.max(0, duTotalPret(pret) - totalRembourse(pret));
+}
+
+/**
+ * L'effet du prêt sur la CAISSE — à ne pas confondre avec ce que doit
+ * l'emprunteur. Il est sorti du capital, il rentre des remboursements : la
+ * différence est ce qui manque en caisse, et elle devient négative — donc un
+ * gain — dès que les intérêts commencent à rentrer.
+ */
+export function effetCaissePret(pret) {
+  return (+pret?.montant || 0) - totalRembourse(pret);
+}
+
+/** Les intérêts déjà encaissés : ce qui, dans les remboursements, dépasse le capital. */
+export function interetsRecus(pret) {
+  return Math.max(0, totalRembourse(pret) - (+pret?.montant || 0));
+}
+
+/**
+ * Les intérêts encaissés au cours d'une année donnée. Les remboursements
+ * s'imputent d'abord sur le capital, et seulement ensuite sur les intérêts :
+ * c'est l'ordre prudent, celui qui ne fait pas apparaître un bénéfice tant que
+ * la caisse n'a pas récupéré sa mise.
+ */
+export function interetsRecusAnnee(pret, annee) {
+  const capital = +pret?.montant || 0;
+  let cumul = 0;
+  let interets = 0;
+  const versements = [...(pret?.remboursements || [])]
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  for (const r of versements) {
+    const avant = cumul;
+    cumul += +r.montant || 0;
+    const part = Math.max(0, cumul - Math.max(capital, avant));
+    if (part > 0 && (annee == null || new Date(r.date).getFullYear() === annee)) interets += part;
+  }
+  return interets;
 }
 
 export function enRetard(pret, aujourdhui = new Date()) {
@@ -142,7 +231,8 @@ export function totalRembourse(pret) {
 export function echeancier(pret, aujourdhui = new Date()) {
   const n = Math.round(+pret.nbEcheances || 0);
   if (n <= 0 || !pret.dateOctroi) return [];
-  const montant = +pret.montant || 0;
+  // C'est le total dû — intérêts compris — qui se découpe en mensualités.
+  const montant = duTotalPret(pret);
   const part = Math.floor(montant / n);
   const depart = new Date(pret.dateOctroi);
   if (isNaN(depart)) return [];
@@ -174,10 +264,11 @@ export function encoursParAdherent(etat) {
     const ligne = parQui.get(p.adherentId) || {
       adherentId: p.adherentId,
       adherent: etat.adherents.find((a) => a.id === p.adherentId) || null,
-      encours: 0, emprunte: 0, rembourse: 0, nombre: 0, enRetard: false
+      encours: 0, emprunte: 0, interets: 0, rembourse: 0, nombre: 0, enRetard: false
     };
     ligne.encours += encours;
     ligne.emprunte += +p.montant || 0;
+    ligne.interets += interetsPret(p);
     ligne.rembourse += totalRembourse(p);
     ligne.nombre += 1;
     if (enRetard(p)) ligne.enRetard = true;
@@ -207,13 +298,20 @@ export function totaux(etat, annee) {
   const credits = mvt.reduce((s, m) => s + (+m.credit || 0), 0);
   const debits = mvt.reduce((s, m) => s + (+m.debit || 0), 0);
 
+  // Ce que les adhérents doivent (intérêts compris) et ce qui manque
+  // réellement en caisse (capital sorti, moins tout ce qui est rentré) sont
+  // deux chiffres différents dès qu'un prêt porte intérêt. Confondre les deux
+  // ferait mentir le solde des deux côtés à la fois.
   const encoursPrets = etat.prets.reduce((s, p) => s + encoursPret(p), 0);
+  const capitalDehors = etat.prets.reduce((s, p) => s + effetCaissePret(p), 0);
+  const produitsPrets = etat.prets.reduce((s, p) => s + interetsRecus(p), 0);
   const pretsEnRetard = etat.prets.filter((p) => enRetard(p)).length;
 
   return {
-    totalCotisations, credits, debits, encoursPrets, pretsEnRetard,
+    totalCotisations, credits, debits, encoursPrets, capitalDehors, produitsPrets,
+    pretsEnRetard,
     nbAdherents: etat.adherents.filter((a) => a.actif !== false).length,
-    solde: totalCotisations + credits - debits - encoursPrets
+    solde: totalCotisations + credits - debits - capitalDehors
   };
 }
 
@@ -337,6 +435,85 @@ export function parMoyen(etat, annee) {
     cumul.set(id, ligne);
   }
   return [...cumul.values()].sort((a, b) => b.montant - a.montant);
+}
+
+/* ---------------------------------------------------- clôture d'exercice --- */
+
+/**
+ * Le partage de fin d'exercice.
+ *
+ * C'est le moment de l'année où une tontine familiale peut se fâcher pour de
+ * bon, et c'est donc celui où le calcul doit être posé noir sur blanc, ligne
+ * par ligne, avant d'être annoncé.
+ *
+ * Deux régimes, selon ce que dit le règlement :
+ *
+ *   • 'integral' — on rend à chacun ses apports de l'exercice, augmentés de sa
+ *     part du résultat. La caisse repart de zéro. C'est le cas le plus courant.
+ *   • 'resultat' — les apports restent en caisse et on ne partage que le
+ *     bénéfice.
+ *
+ * Trois choses sont volontairement séparées et jamais mélangées :
+ *
+ *   — les APPORTS, qui appartiennent déjà à chacun ;
+ *   — le RÉSULTAT, qui se partage au prorata des apports ;
+ *   — ce qui est DEHORS, en prêts non remboursés, et qu'on ne peut pas
+ *     distribuer puisqu'il n'est pas là.
+ *
+ * Et la dette d'un adhérent vient en déduction de ce qu'il reçoit : on ne
+ * rend pas 50 000 à quelqu'un qui en doit 30 000 pour lui en redemander 30 000
+ * le lendemain.
+ */
+export function cloture(etat, annee, mode = 'integral') {
+  const cotisations = (etat.cotisations || []).filter((c) => c.annee === annee);
+  const mouvements = (etat.mouvements || [])
+    .filter((m) => new Date(m.date).getFullYear() === annee);
+
+  // Les remises du tour de rôle ne sont pas une charge : c'est l'argent des
+  // adhérents qui leur revient à leur tour. On les isole.
+  const estTour = (m) => (m.nature || '') === 'Tour de rôle';
+  const estPartage = (m) => (m.nature || '') === 'Partage de clôture';
+
+  const autresProduits = mouvements
+    .filter((m) => !estTour(m) && !estPartage(m))
+    .reduce((s, m) => s + (+m.credit || 0), 0);
+  const charges = mouvements
+    .filter((m) => !estTour(m) && !estPartage(m))
+    .reduce((s, m) => s + (+m.debit || 0), 0);
+  const remisTour = mouvements.filter(estTour).reduce((s, m) => s + (+m.debit || 0), 0);
+  const dejaPartage = mouvements.filter(estPartage).reduce((s, m) => s + (+m.debit || 0), 0);
+
+  const interets = (etat.prets || []).reduce((s, p) => s + interetsRecusAnnee(p, annee), 0);
+  const produits = interets + autresProduits;
+  const resultat = produits - charges;
+
+  const totalApports = cotisations.reduce((s, c) => s + (+c.montant || 0), 0);
+
+  const lignes = (etat.adherents || []).map((a) => {
+    const apport = cotisations
+      .filter((c) => c.adherentId === a.id)
+      .reduce((s, c) => s + (+c.montant || 0), 0);
+    const part = totalApports ? apport / totalApports : 0;
+    const quotePart = Math.round(resultat * part);
+    const dette = encoursAdherent(etat, a.id);
+    const base = mode === 'resultat' ? 0 : apport;
+    return { adherent: a, apport, part, quotePart, dette, aRecevoir: base + quotePart - dette };
+  }).filter((l) => l.apport > 0 || l.dette > 0)
+    .sort((x, y) => y.apport - x.apport);
+
+  const aDistribuer = lignes.reduce((s, l) => s + l.aRecevoir, 0);
+  const t = totaux(etat, null);
+
+  return {
+    annee, mode,
+    totalApports, interets, autresProduits, produits, charges, resultat,
+    remisTour, dejaPartage,
+    lignes, aDistribuer,
+    disponible: t.solde,
+    dehors: t.capitalDehors,
+    // Le signal qui compte : peut-on payer ce qu'on annonce ?
+    manque: Math.max(0, aDistribuer - t.solde)
+  };
 }
 
 /* -------------------------------------------------------- tour de rôle --- */

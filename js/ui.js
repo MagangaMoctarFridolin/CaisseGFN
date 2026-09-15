@@ -6,6 +6,7 @@ import * as DB from './db.js';
 import { blocImpayes } from './suivi.js';
 import { blocRecus } from './recu.js';
 import { bandeauTour } from './tour.js';
+import { blocCloture } from './cloture.js';
 
 const { fmtMontant, fmtNombre, fmtDate, nomComplet, MOIS_NOMS } = DB;
 
@@ -662,6 +663,7 @@ export function vueRapports(ctx) {
         ? etat.adherents.map((a) => h('button', { onClick: () => fiche(a) }, nomComplet(a)))
         : h('span', { class: 'doux' }, 'Aucun adhérent.'))),
     h('div', { class: 'carte' }, blocRecus(ctx, zone)),
+    h('div', { class: 'carte' }, blocCloture(ctx, zone)),
     zone);
 }
 

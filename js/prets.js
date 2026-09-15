@@ -47,8 +47,8 @@ function blocEcheancier(etat, p) {
       h('td', { class: 'num' }, e.couvert ? fmtNombre(e.couvert) : '—'),
       h('td', {}, etiquette(e))))),
     h('tfoot', {}, h('tr', { class: 'total' },
-      h('td', { colspan: 2 }, 'Total'),
-      h('td', { class: 'num' }, fmtMontant(p.montant, dev)),
+      h('td', { colspan: 2 }, 'Total dû'),
+      h('td', { class: 'num' }, fmtMontant(DB.duTotalPret(p), dev)),
       h('td', { class: 'num' }, fmtNombre(DB.totalRembourse(p))),
       h('td', {}, '')))));
 }
@@ -69,6 +69,9 @@ export function vuePrets(ctx) {
       valeur: p.dateOctroi || new Date().toISOString().slice(0, 10) },
     { cle: 'nbEcheances', libelle: 'Nombre de mensualités (0 = en une fois)', type: 'number',
       valeur: p.nbEcheances ?? null },
+    { cle: 'modeInteret', libelle: 'Intérêts', type: 'select', valeur: p.modeInteret || '',
+      options: DB.MODES_INTERET.map((m) => ({ valeur: m.cle, libelle: m.nom })) },
+    { cle: 'tauxInteret', libelle: 'Taux (%)', type: 'number', valeur: p.tauxInteret ?? null },
     { cle: 'dateLimite', libelle: 'Date limite de remboursement', type: 'date',
       valeur: p.dateLimite || '' },
     { cle: 'objet', libelle: 'Objet', large: true, valeur: p.objet || '' }
@@ -110,6 +113,11 @@ export function vuePrets(ctx) {
         h('button', { class: 'pousse', onClick: () => zoneDetail.replaceChildren() }, 'Fermer')),
       h('p', { class: 'doux' },
         fmtMontant(p.montant, dev) + ' prêtés le ' + fmtDate(p.dateOctroi)
+        + (DB.interetsPret(p)
+            ? ' · intérêts ' + fmtNombre(DB.interetsPret(p))
+              + ' (' + DB.nomModeInteret(p.modeInteret).toLowerCase()
+              + (p.tauxInteret ? ', ' + p.tauxInteret + ' %' : '') + ')'
+            : ' · sans intérêt')
         + (p.objet ? ' — ' + p.objet : '')
         + ' · reste dû ' + fmtMontant(DB.encoursPret(p), dev)),
       blocEcheancier(etat, p),
@@ -131,13 +139,15 @@ export function vuePrets(ctx) {
     h('div', { class: 'defilable' }, h('table', { class: 'encours' },
       h('thead', {}, h('tr', {},
         h('th', {}, 'Adhérent'), h('th', { class: 'num' }, 'Prêts'),
-        h('th', { class: 'num' }, 'Emprunté'), h('th', { class: 'num' }, 'Remboursé'),
+        h('th', { class: 'num' }, 'Emprunté'), h('th', { class: 'num' }, 'Intérêts'),
+        h('th', { class: 'num' }, 'Remboursé'),
         h('th', { class: 'num' }, 'Reste dû'), h('th', {}, ''))),
       h('tbody', {}, encours.map((l) => h('tr', {},
         h('td', {}, l.adherent ? nomComplet(l.adherent)
           : h('span', { class: 'doux' }, 'adhérent retiré')),
         h('td', { class: 'num doux' }, l.nombre),
         h('td', { class: 'num' }, fmtNombre(l.emprunte)),
+        h('td', { class: 'num doux' }, l.interets ? fmtNombre(l.interets) : '—'),
         h('td', { class: 'num' }, fmtNombre(l.rembourse)),
         h('td', { class: 'num', style: l.encours ? 'font-weight:650' : '' },
           l.encours ? fmtNombre(l.encours) : '—'),
@@ -148,6 +158,7 @@ export function vuePrets(ctx) {
         h('td', {}, 'Total'),
         h('td', { class: 'num' }, encours.reduce((s, l) => s + l.nombre, 0)),
         h('td', { class: 'num' }, fmtNombre(encours.reduce((s, l) => s + l.emprunte, 0))),
+        h('td', { class: 'num' }, fmtNombre(encours.reduce((s, l) => s + l.interets, 0))),
         h('td', { class: 'num' }, fmtNombre(encours.reduce((s, l) => s + l.rembourse, 0))),
         h('td', { class: 'num' }, fmtMontant(encours.reduce((s, l) => s + l.encours, 0), dev)),
         h('td', {}, '')))))) : null;
@@ -163,7 +174,8 @@ export function vuePrets(ctx) {
       ? h('div', { class: 'carte' }, h('p', { class: 'vide' }, 'Aucun prêt en cours.'))
       : h('div', { class: 'carte' }, h('div', { class: 'defilable' }, h('table', {},
           h('thead', {}, h('tr', {},
-            h('th', {}, 'Adhérent'), h('th', { class: 'num' }, 'Montant'),
+            h('th', {}, 'Adhérent'), h('th', { class: 'num' }, 'Capital'),
+            h('th', { class: 'num' }, 'Intérêts'),
             h('th', { class: 'num' }, 'Remboursé'), h('th', { class: 'num' }, 'Reste dû'),
             h('th', {}, 'Échéance'), h('th', {}, 'État'), h('th', {}, ''))),
           h('tbody', {}, prets.map((p) => {
@@ -176,6 +188,8 @@ export function vuePrets(ctx) {
             return h('tr', {},
               h('td', {}, nomComplet(a), p.objet ? h('div', { class: 'doux' }, p.objet) : null),
               h('td', { class: 'num' }, fmtNombre(p.montant)),
+              h('td', { class: 'num doux' }, DB.interetsPret(p)
+                ? fmtNombre(DB.interetsPret(p)) : '—'),
               h('td', { class: 'num' }, fmtNombre(rembourse)),
               h('td', { class: 'num', style: reste ? 'font-weight:650' : '' },
                 reste ? fmtNombre(reste) : '—'),
