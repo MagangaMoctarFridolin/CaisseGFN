@@ -99,10 +99,15 @@ export function decrire(e, dict, premiere, etat) {
     case 'mouvement': {
       const m = suppression ? fiche(dict, 'mouvement', d.id) || {} : d;
       const signe = +m.credit ? +m.credit : -(+m.debit || 0);
+      // Dire de QUELLE caisse il s'agit : sans cela, une dépense de projet
+      // ressemblerait à une dépense de la caisse familiale.
+      const caisse = m.projetId ? DB.projet(etat, m.projetId)?.nom || 'projet supprimé' : '';
       return {
         verbe, sujet: m.nature || 'Mouvement',
         texte: m.objet || (m.adherentId ? quiEst(dict, m.adherentId) : 'Écriture de caisse'),
-        montant: suppression ? null : signe, precision: m.remarques || ''
+        montant: suppression ? null : signe,
+        precision: [caisse ? 'caisse « ' + caisse + ' »' : null, m.remarques]
+          .filter(Boolean).join(' · ')
       };
     }
     case 'compte': {
@@ -116,7 +121,8 @@ export function decrire(e, dict, premiere, etat) {
         nom: 'nom', adresse: 'adresse', telephone: 'téléphone', email: 'e-mail',
         airtelMoney: 'numéro Airtel Money', canaux: 'moyens de versement',
         devise: 'devise', anneeDemarrage: 'année de démarrage',
-        cotisationMensuelle: 'cotisation mensuelle de référence', tour: 'tour de rôle'
+        cotisationMensuelle: 'cotisation mensuelle de référence', tour: 'tour de rôle',
+        projets: 'caisses de projet'
       };
       return { verbe: 'Réglage', sujet: 'Association',
         texte: champs.length > 4 ? 'Fiche de l’association mise à jour'

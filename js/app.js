@@ -21,6 +21,7 @@ import * as Historique from './historique.js';
 import * as Recu from './recu.js';
 import * as Tour from './tour.js';
 import * as Prets from './prets.js';
+import * as Projets from './projets.js';
 import { CONFIG } from '../config.js';
 
 const { h, toast } = UI;
@@ -31,6 +32,7 @@ const ONGLETS = [
   { cle: 'cotisations', nom: 'Cotisations', vue: UI.vueCotisations },
   { cle: 'tour', nom: 'Tour de rôle', vue: Tour.vueTour },
   { cle: 'prets', nom: 'Prêts', vue: Prets.vuePrets },
+  { cle: 'projets', nom: 'Projets', vue: Projets.vueProjets },
   { cle: 'comptabilite', nom: 'Comptabilité', vue: UI.vueComptabilite },
   { cle: 'rapports', nom: 'Rapports', vue: UI.vueRapports },
   { cle: 'journal', nom: 'Journal', vue: Historique.vueHistorique },
@@ -73,6 +75,9 @@ function contexte() {
     peutEcrire,
     estAdmin,
     surServeur,
+    // La fiche adhérent du compte connecté : c'est elle qui dit à quelles
+    // caisses de projet fermées cette personne a accès.
+    monAdherent: session?.adherent_id || session?.adherentId || null,
     setAnnee(a) { annee = a; anneeChoisie = true; localStorage.setItem('tontine:annee', a); rendre(); },
     rafraichir: rendre,
     blocComptes: surServeur
@@ -128,7 +133,36 @@ function anneeParDefaut(etat) {
   return avecDonnees.includes(courante) ? courante : Math.max(...avecDonnees);
 }
 
+/**
+ * Redessiner l'écran — mais jamais pendant qu'on est déjà en train de le
+ * faire.
+ *
+ * Le cas qui l'a révélé : on tape un montant, on appuie sur Entrée, le champ
+ * perd le focus, la saisie s'enregistre et l'écran se reconstruit. Or
+ * reconstruire l'écran retire le champ qui a encore le focus — ce qui
+ * déclenche un SECOND « perte de focus », donc un second rendu, au beau
+ * milieu du premier. Le navigateur se retrouve alors à retirer un nœud qui
+ * n'est plus là où il l'avait laissé, et il le dit.
+ *
+ * On garde donc un seul rendu à la fois, et toute demande qui survient
+ * pendant ce rendu est reportée juste après — pas plus tard, pas à l'écran
+ * suivant : dès que la pile d'événements s'est vidée.
+ */
+let enRendu = false;
+let rendrePlanifie = false;
+
 function rendre() {
+  if (enRendu) {
+    if (rendrePlanifie) return;
+    rendrePlanifie = true;
+    queueMicrotask(() => { rendrePlanifie = false; rendre(); });
+    return;
+  }
+  enRendu = true;
+  try { dessiner(); } finally { enRendu = false; }
+}
+
+function dessiner() {
   const app = document.getElementById('app');
   const etat = synchro.etat;
   if (!anneeChoisie) annee = anneeParDefaut(etat);

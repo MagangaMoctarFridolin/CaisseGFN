@@ -294,7 +294,10 @@ export function totaux(etat, annee) {
   const cot = etat.cotisations.filter((c) => annee == null || c.annee === annee);
   const totalCotisations = cot.reduce((s, c) => s + (+c.montant || 0), 0);
 
-  const mvt = etat.mouvements.filter((m) => annee == null || new Date(m.date).getFullYear() === annee);
+  // Une écriture rattachée à un projet appartient à la caisse de ce projet,
+  // pas à la caisse commune. Les mélanger ferait mentir les deux.
+  const mvt = etat.mouvements.filter((m) => !m.projetId
+    && (annee == null || new Date(m.date).getFullYear() === annee));
   const credits = mvt.reduce((s, m) => s + (+m.credit || 0), 0);
   const debits = mvt.reduce((s, m) => s + (+m.debit || 0), 0);
 
@@ -467,7 +470,7 @@ export function parMoyen(etat, annee) {
 export function cloture(etat, annee, mode = 'integral') {
   const cotisations = (etat.cotisations || []).filter((c) => c.annee === annee);
   const mouvements = (etat.mouvements || [])
-    .filter((m) => new Date(m.date).getFullYear() === annee);
+    .filter((m) => !m.projetId && new Date(m.date).getFullYear() === annee);
 
   // Les remises du tour de rôle ne sont pas une charge : c'est l'argent des
   // adhérents qui leur revient à leur tour. On les isole.
@@ -514,6 +517,117 @@ export function cloture(etat, annee, mode = 'integral') {
     // Le signal qui compte : peut-on payer ce qu'on annonce ?
     manque: Math.max(0, aDistribuer - t.solde)
   };
+}
+
+/* ---------------------------------------------------- caisses de projet --- */
+
+/**
+ * Une caisse de projet : une cagnotte à part, pour une chose précise.
+ *
+ * La caisse familiale tourne toute l'année et n'a pas de fin. Un projet, si :
+ * on réunit une somme, on la dépense, on clôt. Mélanger les deux dans un même
+ * solde, c'est ne plus savoir ce qui appartient à quoi — d'où la règle qui
+ * gouverne tout le reste : UNE ÉCRITURE APPARTIENT À UNE SEULE CAISSE. Sans
+ * projetId, elle est à la caisse familiale ; avec, elle est au projet, et elle
+ * disparaît des comptes communs.
+ *
+ * Les projets vivent dans la fiche de l'association, comme les moyens de
+ * versement et le tour de rôle : rien à migrer, rien de nouveau à autoriser
+ * côté serveur. L'argent, lui, passe par les mouvements, qui existent déjà.
+ */
+export const TYPES_PROJET = [
+  { cle: 'objectif', nom: 'Objectif à atteindre',
+    aide: 'Une somme à réunir : on suit ce qui est collecté, ce qui est dépensé, et ce qui reste à trouver.' },
+  { cle: 'tontine', nom: 'Seconde tontine',
+    aide: 'Une mensualité par participant, avec le suivi de ceux qui n’ont pas encore versé.' },
+  { cle: 'libre', nom: 'Caisse libre',
+    aide: 'Ni objectif ni mensualité : on met, on retire, on garde le compte.' }
+];
+
+export function nomTypeProjet(cle) {
+  return TYPES_PROJET.find((x) => x.cle === cle)?.nom || 'Caisse libre';
+}
+
+/**
+ * La visibilité. À lire honnêtement :
+ *
+ *   'ferme'  — seuls les participants voient le projet DANS L'APPLICATION ;
+ *   'ouvert' — tous les comptes de l'association le voient.
+ *
+ * Dans les deux cas l'écriture reste réservée aux administrateurs. Et dans les
+ * deux cas les écritures voyagent dans le même journal partagé : « fermé »
+ * veut dire discret, pas secret. Un adhérent qui sait ouvrir le journal y
+ * verra les lignes. Le dire est plus utile que de faire semblant.
+ */
+export const VISIBILITES_PROJET = [
+  { cle: 'ferme', nom: 'Réservé aux participants' },
+  { cle: 'ouvert', nom: 'Ouvert à tous les comptes' }
+];
+
+export function tousLesProjets(etat) {
+  const liste = etat?.association?.projets;
+  return Array.isArray(liste) ? liste : [];
+}
+
+export function projet(etat, id) {
+  return tousLesProjets(etat).find((p) => p.id === id) || null;
+}
+
+export function peutVoirProjet(p, adherentId, estAdmin) {
+  if (!p) return false;
+  if (estAdmin) return true;
+  if (p.visibilite !== 'ferme') return true;
+  return !!adherentId && (p.membres || []).includes(adherentId);
+}
+
+/** Les projets qu'une personne donnée a le droit de voir à l'écran. */
+export function projetsVisibles(etat, adherentId, estAdmin) {
+  return tousLesProjets(etat).filter((p) => peutVoirProjet(p, adherentId, estAdmin));
+}
+
+export function mouvementsProjet(etat, projetId) {
+  return (etat.mouvements || [])
+    .filter((m) => m.projetId === projetId)
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+}
+
+export function totauxProjet(etat, p) {
+  const mvts = mouvementsProjet(etat, p?.id);
+  const collecte = mvts.reduce((s, m) => s + (+m.credit || 0), 0);
+  const depense = mvts.reduce((s, m) => s + (+m.debit || 0), 0);
+  const objectif = +p?.objectif || 0;
+  return {
+    collecte, depense, solde: collecte - depense,
+    objectif,
+    reste: objectif ? Math.max(0, objectif - collecte) : 0,
+    avancement: objectif ? Math.min(100, Math.round((collecte / objectif) * 100)) : 0,
+    nbEcritures: mvts.length
+  };
+}
+
+/**
+ * Ce que chaque participant a versé — et, pour une seconde tontine, ce qui
+ * manque au titre du mois observé.
+ */
+export function contributionsProjet(etat, p, annee, mois) {
+  const mvts = mouvementsProjet(etat, p?.id);
+  const mensualite = +p?.mensualite || 0;
+  return (p?.membres || []).map((id) => {
+    const adherent = etat.adherents.find((a) => a.id === id) || null;
+    const siens = mvts.filter((m) => m.adherentId === id && +m.credit > 0);
+    const verse = siens.reduce((s, m) => s + (+m.credit || 0), 0);
+    const duMois = (annee == null || mois == null) ? 0 : siens
+      .filter((m) => {
+        const d = new Date(m.date);
+        return !isNaN(d) && d.getFullYear() === annee && d.getMonth() + 1 === mois;
+      })
+      .reduce((s, m) => s + (+m.credit || 0), 0);
+    return {
+      adherentId: id, adherent, verse, duMois,
+      attendu: mensualite,
+      manque: mensualite ? Math.max(0, mensualite - duMois) : 0
+    };
+  }).sort((x, y) => y.verse - x.verse);
 }
 
 /* -------------------------------------------------------- tour de rôle --- */

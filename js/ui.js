@@ -500,8 +500,10 @@ export function vueComptabilite(ctx) {
   const supprimer = (m) => confirmer('Supprimer ce mouvement ?',
     () => ctx.enregistrer('mouvement', 'delete', { id: m.id }));
 
+  // Les écritures d'une caisse de projet ont leur propre écran : elles ne
+  // doivent pas apparaître dans la comptabilité de la caisse familiale.
   const mvts = etat.mouvements
-    .filter((m) => new Date(m.date).getFullYear() === annee)
+    .filter((m) => !m.projetId && new Date(m.date).getFullYear() === annee)
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
   let solde = 0;
